@@ -348,6 +348,7 @@ public class BrowseDAOPostgres implements BrowseDAO
         throws BrowseException
     {
         String query = getQuery();
+        log.info("item query hibernate ==========================>"+query);
         Object[] params = getQueryParams();
 
         if (log.isDebugEnabled())

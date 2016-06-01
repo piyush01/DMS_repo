@@ -1,0 +1,19 @@
+# Registration notification email
+#
+# Parameters: {0} The name of the DSpace instance
+#             {1} The URL of the DSpace instance 
+#             {2} Name:
+#             {3} Email:
+#             {4} Registration Date:
+#
+# See org.dspace.core.Email for information on the format of this file.
+#
+Subject: CBSL GROUP: DisApproval Notification
+
+Your Account is DisApproved. you can't login to DMS.
+
+
+
+Regards,
+Java Software Team
+CBSL Group Pvt. Ltd.

@@ -16,6 +16,7 @@ import org.dspace.authorize.AuthorizeException;
 import org.dspace.core.*;
 import org.dspace.eperson.AccountManager;
 import org.dspace.eperson.EPerson;
+import org.dspace.eperson.Group;
 
 import javax.mail.MessagingException;
 import javax.mail.internet.AddressException;
@@ -90,6 +91,7 @@ public class RegisterServlet extends DSpaceServlet
 
         if (token == null)
         {
+        	log.info("if forget");
             // Simple "enter your e-mail" page
             if (registering)
             {
@@ -98,18 +100,43 @@ public class RegisterServlet extends DSpaceServlet
                 {
                     JSPManager.showJSP(request, response, "/register/new-ldap-user.jsp");
                 }
-                JSPManager.showJSP(request, response, "/register/new-user.jsp");
+                //JSPManager.showJSP(request, response, "/register/new-user.jsp");
+                /*================================================================================================================*/
+                int sortBy = Group.ID;
+                String sbParam = request.getParameter("sortby");
+
+        		if (sbParam != null && sbParam.equals("id"))
+        		{
+        			sortBy = Group.ID;
+        		}
+        		
+        		// What's the index of the first group to show?  Default is 0
+        		int first = UIUtil.getIntParameter(request, "first");
+        		if (first == -1)
+                {
+                    first = 0;
+                }
+
+        		// Retrieve the e-people in the specified order
+        		Group[] groups = Group.findAll(context, sortBy);
+        		
+        		// Set attributes for JSP
+        		request.setAttribute("sortby", Integer.valueOf(sortBy));
+        		request.setAttribute("first",  Integer.valueOf(first));
+        		request.setAttribute("groups", groups);
+                /*==================================================================================================================*/
+                JSPManager.showJSP(request, response,"/register/registration-form.jsp"); 
             }
             else
             {
                 // User forgot their password
-                JSPManager.showJSP(request, response,
-                        "/register/forgot-password.jsp");
+                JSPManager.showJSP(request, response,"/register/forgot-password.jsp");
             }
         }
         else
         {
-            // We have a token. Find out who the it's for
+        	log.info("else forget");
+        	// We have a token. Find out who the it's for
             String email = AccountManager.getEmail(context, token);
 
             EPerson eperson = null;
@@ -138,12 +165,14 @@ public class RegisterServlet extends DSpaceServlet
             }
             else if (!registering && (eperson != null))
             {
+            	log.info("new-password.jsp");
                 // Token relates to user who's forgotten password
                 JSPManager.showJSP(request, response,
                         "/register/new-password.jsp");
             }
             else
             {
+            	log.info("invalid-token.jsp");
                 // Duff token!
                 JSPManager.showJSP(request, response,
                         "/register/invalid-token.jsp");
@@ -162,10 +191,21 @@ public class RegisterServlet extends DSpaceServlet
          * password" or "new user" forms, or the "enter profile information" or
          * "enter new password" forms.
          */
-
         // First get the step
+    	String button = UIUtil.getSubmitButton(request, "submit");
+ 
         int step = UIUtil.getIntParameter(request, "step");
-
+        if(button.equals("submit_register"))
+        {
+        	processPersonalInfo(context, request, response);
+        }
+        else if(button.equals("submit_cancel"))
+        {
+        	JSPManager.showJSP(request, response, "/components/login-form.jsp");
+        	context.complete();
+        }
+        else
+        {
         switch (step)
         {
         case ENTER_EMAIL_PAGE:
@@ -187,6 +227,7 @@ public class RegisterServlet extends DSpaceServlet
             log.warn(LogManager.getHeader(context, "integrity_error", UIUtil
                     .getRequestLogInfo(request)));
             JSPManager.showIntegrityError(request, response);
+        }
         }
     }
 
@@ -426,125 +467,68 @@ public class RegisterServlet extends DSpaceServlet
             throws ServletException, IOException, SQLException,
             AuthorizeException
     {
-        // Get the token
-        String token = request.getParameter("token");
-
-        // Get the email address
-        String email = AccountManager.getEmail(context, token);
-        String netid = request.getParameter("netid");
-        if ((netid!=null)&&(email==null))
+    	int sortBy = Group.ID;
+        String sbParam = request.getParameter("sortby");
+     	Group[] groups = Group.findAll(context, sortBy);	
+     	int first = UIUtil.getIntParameter(request, "first");
+    	String email = request.getParameter("email");
+    	if (email == null || email.length() > 64)
         {
-            email = request.getParameter("email");
-        }
-        
-        // If the token isn't valid, show an error
-        if (email == null && netid==null)
-        {
-            log.info(LogManager.getHeader(context, "invalid_token", "token="
-                + token));
-
-            // Invalid token
-            JSPManager
-                .showJSP(request, response, "/register/invalid-token.jsp");
-
-            return;
-        }
-
-        // If the token is valid, we create an eperson record if need be
-        EPerson eperson = null;
-        if (email!=null)
-        {
-            eperson = EPerson.findByEmail(context, email);
-        }
-        EPerson eperson2 = null;
-        if (netid!=null)
-        {
-            eperson2 = EPerson.findByNetid(context, netid.toLowerCase());
-        }
-        if (eperson2 !=null)
-        {
-            eperson = eperson2;
-        }
-        
-        if (eperson == null)
-        {
-            // Need to create new eperson
-            // FIXME: TEMPORARILY need to turn off authentication, as usually
-            // only site admins can create e-people
-            context.setIgnoreAuthorization(true);
-            eperson = EPerson.create(context);
-            eperson.setEmail(email);
-            if (netid!=null)
-            {
-                eperson.setNetid(netid.toLowerCase());
-            }
-            eperson.update();
-            context.setIgnoreAuthorization(false);
-        }
-
-        // Now set the current user of the context
-        // to the user associated with the token, so they can update their
-        // info
-        context.setCurrentUser(eperson);
-
-        // Set the user profile info
-        boolean infoOK = EditProfileServlet.updateUserProfile(eperson, request);
-
-        eperson.setCanLogIn(true);
-        eperson.setSelfRegistered(true);
-
-        // Give site auth a chance to set/override appropriate fields
-        AuthenticationManager.initEPerson(context, request, eperson);
-
-        // If the user set a password, make sure it's OK
-        boolean passwordOK = true;
-        if (!eperson.getRequireCertificate() && netid==null &&
-            AuthenticationManager.allowSetPassword(context, request,
-                eperson.getEmail()))
-        {
-            passwordOK = EditProfileServlet.confirmAndSetPassword(eperson,
-                    request);
-        }
-
-        if (infoOK && passwordOK)
-        {
-            // All registered OK.
-            log.info(LogManager.getHeader(context, "usedtoken_register",
-                    "email=" + eperson.getEmail()));
-
-            // delete the token
-            if (token!=null)
-            {
-                AccountManager.deleteToken(context, token);
-            }
-            
-            // Update user record
-            eperson.update();
-
-            request.setAttribute("eperson", eperson);
-
-            JSPManager.showJSP(request, response, "/register/registered.jsp");
-            context.complete();
+        	// Malformed request or entered value is too long.
+        	email = "";
         }
         else
         {
-            request.setAttribute("token", token);
-            request.setAttribute("eperson", eperson);
-            request.setAttribute("netid", netid);
-            request.setAttribute("missing.fields", Boolean.valueOf(!infoOK));
-            request.setAttribute("password.problem", Boolean.valueOf(!passwordOK));
-
-            // Indicate if user can set password
-            boolean setPassword = AuthenticationManager.allowSetPassword(
-                    context, request, email);
-            request.setAttribute("set.password", Boolean.valueOf(setPassword));
-
-            JSPManager.showJSP(request, response,
-                    "/register/registration-form.jsp");
-
-            // Changes to/creation of e-person in DB cancelled
-            context.abort();
+        	email = email.toLowerCase().trim();
         }
+    	 String netid = request.getParameter("netid");
+         String password = request.getParameter("password");
+        // EPerson eperson = EPerson.findByEmail(context, email);
+         if(EPerson.findByEmail(context, email)==null) 
+		{
+
+ 			// Find out from site authenticator whether this email can
+ 		    // self-register
+ 		    boolean canRegister =AuthenticationManager.canSelfRegister(context, request, email);
+ 			if(canRegister)
+ 			{
+ 				context.setIgnoreAuthorization(true);
+ 				EPerson eperson=EPerson.create(context);
+ 				eperson.setEmail(email);
+ 				eperson.setPassword(request.getParameter("password"));
+ 				eperson.setFirstName(request.getParameter("first_name"));
+ 				eperson.setLastName(request.getParameter("last_name"));
+ 				eperson.setSuperiorEmail(request.getParameter("superioremailid"));
+ 				eperson.setUserDesignation(request.getParameter("designation"));
+ 				eperson.setSuperiorName(request.getParameter("superiorename"));
+ 				eperson.setCanLogIn(false);
+ 				eperson.setSelfRegistered(true);
+ 				eperson.setStatus("s");
+ 				eperson.setMetadata("language","en");
+ 				eperson.setMetadata("phone",request.getParameter("phone"));
+ 				eperson.setepersongroup2eperson(eperson.getID(),Integer.parseInt(request.getParameter("group_id")));
+ 				eperson.update();
+ 				 	request.setAttribute("eperson", eperson);
+ 		            JSPManager.showJSP(request, response, "/register/registered.jsp");
+ 		            context.complete();
+ 			}
+ 			else
+ 			{
+ 				JSPManager.showJSP(request, response,"/register/cannot-register.jsp");
+ 				context.complete();
+ 			}
+ 		
+		}
+		else
+		{
+
+			request.setAttribute("sortby", Integer.valueOf(sortBy));
+			request.setAttribute("first",  Integer.valueOf(first));
+			request.setAttribute("groups", groups);
+			request.setAttribute("email_exists",Boolean.TRUE);
+		 	JSPManager.showJSP(request, response,"/register/registration-form.jsp");
+		 	context.complete();
+		}
     }
 
     /**

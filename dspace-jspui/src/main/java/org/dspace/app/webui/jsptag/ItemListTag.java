@@ -13,45 +13,44 @@ import org.apache.log4j.Logger;
 import org.dspace.app.itemmarking.ItemMarkingExtractor;
 import org.dspace.app.itemmarking.ItemMarkingInfo;
 import org.dspace.app.webui.util.UIUtil;
-
 import org.dspace.browse.BrowseException;
 import org.dspace.browse.BrowseIndex;
 import org.dspace.browse.CrossLinks;
-
 import org.dspace.content.Bitstream;
+import org.dspace.content.Bundle;
+import org.dspace.content.Collection;
 import org.dspace.content.DCDate;
+import org.dspace.content.DSpaceObject;
+import org.dspace.content.DmsMetadaField;
 import org.dspace.content.Metadatum;
 import org.dspace.content.Item;
 import org.dspace.content.Thumbnail;
 import org.dspace.content.service.ItemService;
-
 import org.dspace.core.ConfigurationManager;
 import org.dspace.core.Constants;
 import org.dspace.core.Context;
 import org.dspace.core.Utils;
-
 import org.dspace.sort.SortOption;
 import org.dspace.storage.bitstore.BitstreamStorageManager;
 import org.dspace.utils.DSpace;
 
 import java.awt.image.BufferedImage;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-
 import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.StringTokenizer;
 
 import javax.imageio.ImageIO;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.jsp.JspException;
 import javax.servlet.jsp.JspWriter;
 import javax.servlet.jsp.jstl.fmt.LocaleSupport;
 import javax.servlet.jsp.tagext.TagSupport;
+
 import org.dspace.content.authority.MetadataAuthorityManager;
+import org.dspace.handle.HandleManager;
 
 /**
  * Tag for display a list of items
@@ -84,8 +83,11 @@ public class ItemListTag extends TagSupport
     private static boolean linkToBitstream = false;
 
     /** Config to include an edit link */
-    private boolean linkToEdit = false;
-
+    private boolean linkToEdit = true;
+    
+    /** Config to include an edit link */
+    private boolean linkToView = false;
+    
     /** Config to disable cross links */
     private boolean disableCrossLinks = false;
 
@@ -100,7 +102,7 @@ public class ItemListTag extends TagSupport
 
     /** The default field which is bound to the browse by title */
     private static String titleField = "dc.title";
-
+    private static String viewField = "dc.subject";
     private static String authorField = "dc.contributor.*";
 
     private int authorLimit = -1;
@@ -108,7 +110,7 @@ public class ItemListTag extends TagSupport
     private transient SortOption sortOption = null;
 
     private static final long serialVersionUID = 348762897199116432L;
-
+    String filename="";      
     static
     {
         getThumbSettings();
@@ -153,16 +155,18 @@ public class ItemListTag extends TagSupport
     {
         JspWriter out = pageContext.getOut();
         HttpServletRequest hrq = (HttpServletRequest) pageContext.getRequest();
-
+        String handle = null;
+        DSpaceObject dso = null;
         boolean emphasiseDate = false;
         boolean emphasiseTitle = false;
-
+        Context context=null;
+        DmsMetadaField[] fieldnamecollection=new DmsMetadaField[0] ;
+		
         if (emphColumn != null)
         {
             emphasiseDate = emphColumn.equalsIgnoreCase("date");
             emphasiseTitle = emphColumn.equalsIgnoreCase("title");
         }
-
         // get the elements to display
         String configLine = null;
         String widthLine  = null;
@@ -187,7 +191,6 @@ public class ItemListTag extends TagSupport
             configLine = ConfigurationManager.getProperty("webui.itemlist.columns");
             widthLine  = ConfigurationManager.getProperty("webui.itemlist.widths");
         }
-
         // Have we read a field configration from dspace.cfg?
         if (configLine != null)
         {
@@ -255,6 +258,8 @@ public class ItemListTag extends TagSupport
         String[] browseType = new String[fieldArr.length];
         String[] cOddOrEven = new String[fieldArr.length];
 
+        int oldField=fieldArr.length;
+        int newField=0;
         try
         {
             // Get the interlinking configuration too
@@ -265,17 +270,17 @@ public class ItemListTag extends TagSupport
 
             // If we have column widths, output a fixed layout table - faster for browsers to render
             // but not if we have to add an 'edit item' button - we can't know how big it will be
-            if (widthArr.length > 0 && widthArr.length == fieldArr.length && !linkToEdit)
+            if (widthArr.length > 0 && widthArr.length == fieldArr.length && linkToEdit)
             {
                 // If the table width has been specified, we can make this a fixed layout
                 if (!StringUtils.isEmpty(tablewidth))
                 {
-                    out.println("<table style=\"width: " + tablewidth + "; table-layout: fixed;\" align=\"center\" class=\"table\" summary=\"This table browses all dspace content\">");
+                    out.println("<table id=\"example1\"  class=\"table table-bordered table-striped\" >");
                 }
                 else
                 {
                     // Otherwise, don't constrain the width
-                    out.println("<table align=\"center\" class=\"table\" summary=\"This table browses all dspace content\">");
+                    out.println("<table  id=\"example1\"  class=\"table table-bordered table-striped\" >");
                 }
 
                 // Output the known column widths
@@ -302,16 +307,16 @@ public class ItemListTag extends TagSupport
             }
             else if (!StringUtils.isEmpty(tablewidth))
             {
-                out.println("<table width=\"" + tablewidth + "\" align=\"center\" class=\"table\" summary=\"This table browses all dspace content\">");
+                out.println("<table id=\"example1\"  class=\"table table-bordered table-striped\" >");
             }
             else
             {
-                out.println("<table align=\"center\" class=\"table\" summary=\"This table browses all dspace content\">");
+                out.println("<table id=\"example1\"  class=\"table table-bordered table-striped\">");
             }
 
             // Output the table headers
-            out.println("<tr>");
-
+            out.println("<thead><tr>");
+            out.print("<th><strong>Document Name</strong></th>");
             for (int colIdx = 0; colIdx < fieldArr.length; colIdx++)
             {
                 String field = fieldArr[colIdx].toLowerCase().trim();
@@ -361,55 +366,155 @@ public class ItemListTag extends TagSupport
                 {
                 	markClass = " "+field+"_th";
                 }
-
                 // output the header
-                out.print("<th id=\"" + id +  "\" class=\"" + css + markClass +"\">"
-                        + (emph[colIdx] ? "<strong>" : "")
-                        + LocaleSupport.getLocalizedMessage(pageContext, message)
-                        + (emph[colIdx] ? "</strong>" : "") + "</th>");
+                out.print("<th></th>");
             }
-
+       
+            
             if (linkToEdit)
             {
-                String id = "t" + Integer.toString(cOddOrEven.length + 1);
-                String css = "oddRow" + cOddOrEven[cOddOrEven.length - 2] + "Col";
-
                 // output the header
-                out.print("<th id=\"" + id +  "\" class=\"" + css + "\">"
+                out.print("<th>"
                         + (emph[emph.length - 2] ? "<strong>" : "")
                         + "&nbsp;" //LocaleSupport.getLocalizedMessage(pageContext, message)
                         + (emph[emph.length - 2] ? "</strong>" : "") + "</th>");
             }
-
-            out.print("</tr>");
-
+            out.print("</tr></thead><tbody>");
+            
+            try {
+   			 context = UIUtil.obtainContext(hrq);				 
+   		} catch (SQLException e1) {
+   			// TODO Auto-generated catch block
+   			e1.printStackTrace();
+   		}
             // now output each item row
             for (int i = 0; i < items.length; i++)
             {
-                // now prepare the XHTML frag for this division
+            
+            	int item_id=items[i].getID();
+            	log.info("item_id:---------------------"+item_id);
+            	try {
+				int collection_id=Collection.getCollectionByItemId(context, item_id);
+				
+				log.info("collection_id:---------------------"+collection_id);				
+				 fieldnamecollection= DmsMetadaField.getFieldNameByCollection(context, collection_id);
+					 
+				} catch (SQLException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+               // now prepare the XHTML frag for this division
             	out.print("<tr>"); 
-                String rOddOrEven;
-                if (i == highlightRow)
+              
+            	 handle=items[i].getHandle();
+                 String document=getFileName(handle);
+                 if (document.indexOf(".") > 0)
+                	 document = document.substring(0, document.lastIndexOf("."));
+                 
+                 out.print("<td><a  href=\"" + hrq.getContextPath() + "/handle/"+ items[i].getHandle() + "\">" + document+ "</a></td>");
+                 
+                if(fieldnamecollection.length>0)
                 {
-                    rOddOrEven = "highlight";
-                }
-                else
-                {
-                    rOddOrEven = ((i & 1) == 1 ? "odd" : "even");
-                }
+                	newField=fieldnamecollection.length;
+                	int count=0;
+              	  for (int colIdx = 0; colIdx < fieldnamecollection.length; colIdx++)
+                    {
+              		if(colIdx==5){
+            	    	break;
+            	    }
+              		emph= new boolean[fieldnamecollection.length];
+                	  handle=items[i].getHandle();
+                	  String field = fieldnamecollection[colIdx].getFieldName();                    	  
+                	  
+                	  log.info("field:------->"+field);                	  
+                	  log.info("collection id:---------"+items[i].getID());                	  
+                	  log.info("collection handle:--"+handle);
+                	  
+                    StringTokenizer eq = new StringTokenizer(field, ".");                        
 
+                    String[] tokens = { "", "", "" };
+                    
+                    int k = 0;
+                    
+                    while(eq.hasMoreTokens())
+                    {
+                        tokens[k] = eq.nextToken().toLowerCase().trim();
+                        k++;
+                    }
+                    String schema = tokens[0];
+                    String element = tokens[1];
+                    String qualifier = tokens[2];
+
+                    
+                    log.info("qualifier:---------"+qualifier);
+                    // first get hold of the relevant metadata for this column
+                    Metadatum[] metadataArray;
+                    
+                    metadataArray = items[i].getMetadata("dc", schema, Item.ANY, Item.ANY);                        
+                    
+                   
+                    if (metadataArray == null)
+                    {
+                    	metadataArray = new Metadatum[0];
+                    }
+                    
+                    log.info("metadataArray length:-------------------"+metadataArray.length);
+
+                    log.info("metadataArray length:-------------------"+metadataArray.length);
+                    
+                    // now prepare the content of the table division
+                    String metadata = "-";                        
+                    
+                     if (metadataArray.length > 0)
+                    {
+                    	metadata = Utils.addEntities(metadataArray[0].value);
+                    	
+                    }
+                    //In case title has no value, replace it with "undefined" so as the user has something to
+                	//click in order to access the item page                    
+                     if (field.equals(titleField)){
+                    	String undefined = LocaleSupport.getLocalizedMessage(pageContext, "itemlist.title.undefined");
+                    	if (items[i].isWithdrawn())
+                        {
+                            metadata = "<span style=\"font-style:italic\">("+undefined+")</span>";
+                        }
+                        // format the title field correctly (as long as the item isn't withdrawn, link to it)
+                        else
+                        {
+                          metadata = "<a href=\"" + hrq.getContextPath() + "/handle/"
+                            + items[i].getHandle() + "\">"
+                            + "<span style=\"font-style:italic\">("+undefined+")</span>"
+                            + "</a>";
+                        }
+                    }
+                    
+                     /*if(count==0 && metadataArray.length!=0)
+                     {
+                      metadata = "<a  href=\"" + hrq.getContextPath() + "/handle/"
+                                 + items[i].getHandle() + "\">"
+                                 + Utils.addEntities(metadataArray[0].value)
+                                 + "</a>";  
+                      count++;
+                     }*/
+                     
+                    out.print("<td>"+ metadata +"</td>");                  
+                }
+              	  if(newField!=oldField){
+              		 int field=oldField-newField; 
+              		 
+             		  for(int p=0; p<field; p++){
+             			 out.print("<td>--</td>");  
+             		  }  
+              	  }
+              }
+                else
+                {                
                 for (int colIdx = 0; colIdx < fieldArr.length; colIdx++)
                 {
                     String field = fieldArr[colIdx];
 
-                    // get the schema and the element qualifier pair
-                    // (Note, the schema is not used for anything yet)
-                    // (second note, I hate this bit of code.  There must be
-                    // a much more elegant way of doing this.  Tomcat has
-                    // some weird problems with variations on this code that
                     // I tried, which is why it has ended up the way it is)
                     StringTokenizer eq = new StringTokenizer(field, ".");
-
                     String[] tokens = { "", "", "" };
                     int k = 0;
                     while(eq.hasMoreTokens())
@@ -420,9 +525,12 @@ public class ItemListTag extends TagSupport
                     String schema = tokens[0];
                     String element = tokens[1];
                     String qualifier = tokens[2];
-
+                    
+                    Metadatum[] metadataArray=new Metadatum[0];
+                    
+                    	log.info("else condition");
                     // first get hold of the relevant metadata for this column
-                    Metadatum[] metadataArray;
+                   
                     if (qualifier.equals("*"))
                     {
                         metadataArray = items[i].getMetadata(schema, element, Item.ANY, Item.ANY);
@@ -441,7 +549,6 @@ public class ItemListTag extends TagSupport
                     {
                         metadataArray = new Metadatum[0];
                     }
-
                     // now prepare the content of the table division
                     String metadata = "-";
                     if (field.equals("thumbnail"))
@@ -454,6 +561,7 @@ public class ItemListTag extends TagSupport
                     }
                     if (metadataArray.length > 0)
                     {
+                    	log.info("metadataArray:-0-----------"+metadataArray.length);
                         // format the date field correctly
                         if (isDate[colIdx])
                         {
@@ -468,10 +576,15 @@ public class ItemListTag extends TagSupport
                         // format the title field correctly
                         else if (field.equals(titleField))
                         {
-                            metadata = "<a href=\"" + hrq.getContextPath() + "/handle/"
-                            + items[i].getHandle() + "\">"
-                            + Utils.addEntities(metadataArray[0].value)
-                            + "</a>";
+                        	metadata=Utils.addEntities(metadataArray[0].value);
+                        	/*
+                        	  metadata = "<a data-toggle=\"tooltip\" title=\"Multiple Files.\" href=\"" + hrq.getContextPath() + "/handle/"
+                                    + items[i].getHandle() + "\">"
+                                    + Utils.addEntities(metadataArray[0].value)
+                                    + "</a>"; 
+                        */}
+                        else if(field.equals("viewField")){
+                        	 metadata = "<a class=\"btn btn-primary\" href=\"" + hrq.getContextPath() + "/tools/edit-item?item_id" + items[i].getID()+ "\">View</a>";
                         }
                         // format all other fields
                         else
@@ -559,11 +672,12 @@ public class ItemListTag extends TagSupport
                         // format the title field correctly (as long as the item isn't withdrawn, link to it)
                         else
                         {
+                        	/*
                             metadata = "<a href=\"" + hrq.getContextPath() + "/handle/"
                             + items[i].getHandle() + "\">"
                             + "<span style=\"font-style:italic\">("+undefined+")</span>"
                             + "</a>";
-                        }
+                        */}
                     }
 
                     // prepare extra special layout requirements for dates
@@ -581,30 +695,48 @@ public class ItemListTag extends TagSupport
 
                     
                     String id = "t" + Integer.toString(colIdx + 1);
-                    out.print("<td headers=\"" + id + "\" class=\""
-                    	+ rOddOrEven + "Row" + cOddOrEven[colIdx] + "Col" + markClass + "\" " + extras + ">"
-                        + (emph[colIdx] ? "<strong>" : "") + metadata + (emph[colIdx] ? "</strong>" : "")
-                        + "</td>");
+                    out.print("<td>" + metadata + "</td>");
+                    handle=items[i].getHandle();
                 }
-
-                // Add column for 'edit item' links
+                }
+               
+           	// Add column for 'edit item' links
+                
                 if (linkToEdit)
+                { 
+                      out.print("<td>"
+                        + "<form method=\"get\" action=\"" + hrq.getContextPath() + "/tools/edit-item\">"
+                        + "<input type=\"hidden\" name=\"handle\" value=\"" + items[i].getHandle() + "\" />"
+                        + "<input type=\"hidden\" name=\"action\" value=\"1\" />"
+                        + "<input type=\"hidden\" name=\"item_id\" value=\""+item_id+"\" />"
+                        + "<span class=\"icon-input-btn\"><span class=\"glyphicon glyphicon-edit\"></span><input class=\"btn btn-success btn-xs\" type=\"submit\" value=\"Edit\" />&nbsp;"
+                        + "<span class=\"icon-input-btn\"><span class=\"glyphicon glyphicon-trash\"></span><input class=\"btn btn-danger btn-xs\" name=\"submit_delete\" type=\"submit\" value=\"Delete\" /></form>"
+                        + "</td>");                
+                }
+                else
+                {
+                	out.print("<td></td>");
+                }
+               /* if (linkToEdit)
                 {
                     String id = "t" + Integer.toString(cOddOrEven.length + 1);
 
-                        out.print("<td headers=\"" + id + "\" class=\""
-                            + rOddOrEven + "Row" + cOddOrEven[cOddOrEven.length - 2] + "Col\" nowrap>"
+                        out.print("<td>"
                             + "<form method=\"get\" action=\"" + hrq.getContextPath() + "/tools/edit-item\">"
                             + "<input type=\"hidden\" name=\"handle\" value=\"" + items[i].getHandle() + "\" />"
-                            + "<input type=\"submit\" value=\"Edit Item\" /></form>"
+                            + "<input class=\"btn btn-success btn-xs\" type=\"submit\" value=\"Edit\" /></form>"
                             + "</td>");
                     }
+                else
+                {
+                	out.print("<td></td>");
+                }*/
 
                 out.println("</tr>");
             }
 
             // close the table
-            out.println("</table>");
+            out.println("</tbody></table>");
         }
         catch (IOException ie)
         {
@@ -617,7 +749,241 @@ public class ItemListTag extends TagSupport
 
         return SKIP_BODY;
     }
+    
+    
+    private String getCheckOutUrl(String handle ) throws IOException
+    {
+    	DSpaceObject dso = null;
+    	String bsUrl="";
+        HttpServletRequest request = (HttpServletRequest) pageContext.getRequest();         
+        try
+        {
+             Context context = UIUtil.obtainContext(request);
+        	if (handle != null)
+            {
+                dso = HandleManager.resolveToObject(context, handle);
+            } 
+        	
+        	 Item item = (Item) dso;        	
+        	Bundle[] bundles = item.getBundles("ORIGINAL");
+            		for (int i = 0; i < bundles.length; i++)
+            		{
+            			Bitstream[] bitstreams = bundles[i].getBitstreams();
 
+            			for (int k = 0; k < bitstreams.length; k++)
+            			{
+            				// Skip internal types
+            				if (!bitstreams[k].getFormat().isInternal())
+            				{  
+            					String filename="";            					
+            					filename=UIUtil.encodeBitstreamName(bitstreams[k].getName(), Constants.DEFAULT_ENCODING);
+            					
+            				 bsUrl =request.getContextPath()+"/bitstream/"+ item.getHandle()+ "/" + bitstreams[k].getSequenceID()
+                                         + "/" + UIUtil.encodeBitstreamName(bitstreams[k].getName(), Constants.DEFAULT_ENCODING);												  
+							  
+							}
+            			}
+            		}
+                  }
+        catch(SQLException sqle)
+        {
+        	throw new IOException(sqle.getMessage(), sqle);
+        }
+                
+       log.info("viewer url:------------------"+bsUrl); 
+       
+      return bsUrl;
+    }
+
+    private String getFileName(String handle ) throws IOException
+    {
+    	 
+    	DSpaceObject dso = null;
+    	String viewerUrl1="";
+        JspWriter out = pageContext.getOut();      
+        HttpServletRequest request = (HttpServletRequest) pageContext.getRequest();         
+        try
+        {
+             Context context = UIUtil.obtainContext(request);
+        	if (handle != null)
+            {
+                dso = HandleManager.resolveToObject(context, handle);
+            } 
+        	
+        	 Item item = (Item) dso;        	
+        	Bundle[] bundles = item.getBundles("ORIGINAL");
+        	
+        	boolean filesExist = false;            
+            for (Bundle bnd : bundles)
+            {
+            	filesExist = bnd.getBitstreams().length > 0;
+            	if (filesExist)
+            	{
+            		break;
+            	}
+            }
+            
+            // if user already has uploaded at least one file
+        	if (!filesExist)
+        	{
+        	
+        	}
+        	else
+        	{
+            	// if primary bitstream is html, display a link for only that one to
+            	// HTMLServlet            	
+            		for (int i = 0; i < bundles.length; i++)
+            		{
+            			Bitstream[] bitstreams = bundles[i].getBitstreams();
+
+            			for (int k = 0; k < bitstreams.length; k++)
+            			{
+            				// Skip internal types
+            				if (!bitstreams[k].getFormat().isInternal())
+            				{              							
+            				 filename=bitstreams[k].getName();
+            					
+							}
+            			}
+            		}
+            	            	
+        	}
+        }
+        catch(SQLException sqle)
+        {
+        	throw new IOException(sqle.getMessage(), sqle);
+        }                    
+       
+      return filename;
+    }
+          
+    
+    private String listBitstreams(String handle ) throws IOException
+    {
+    	DSpaceObject dso = null;
+    	String viewerUrl1="";
+        JspWriter out = pageContext.getOut();      
+        HttpServletRequest request = (HttpServletRequest) pageContext.getRequest();         
+        try
+        {
+             Context context = UIUtil.obtainContext(request);
+        	if (handle != null)
+            {
+                dso = HandleManager.resolveToObject(context, handle);
+            } 
+        	
+        	 Item item = (Item) dso;        	
+        	
+        	Bundle[] bundles = item.getBundles("ORIGINAL");
+        	boolean filesExist = false;            
+            for (Bundle bnd : bundles)
+            {
+            	filesExist = bnd.getBitstreams().length > 0;
+            	if (filesExist)
+            	{
+            		break;
+            	}
+            }
+            
+            // if user already has uploaded at least one file
+        	if (!filesExist)
+        	{
+        	
+        	}
+        	else
+        	{
+            	// if primary bitstream is html, display a link for only that one to
+            	// HTMLServlet            	
+            		for (int i = 0; i < bundles.length; i++)
+            		{
+            			Bitstream[] bitstreams = bundles[i].getBitstreams();
+
+            			for (int k = 0; k < bitstreams.length; k++)
+            			{
+            				// Skip internal types
+            				if (!bitstreams[k].getFormat().isInternal())
+            				{                         
+            					
+            				String bsUrl = "bitstream/"+ item.getHandle()+ "/" + bitstreams[k].getSequenceID()
+                                         + "/" + UIUtil.encodeBitstreamName(bitstreams[k].getName(), Constants.DEFAULT_ENCODING);							 
+							  viewerUrl1="/viewer.jsp?file="+bsUrl;
+							}
+            			}
+            		}
+            	            	
+        	}
+        }
+        catch(SQLException sqle)
+        {
+        	throw new IOException(sqle.getMessage(), sqle);
+        }
+                
+       log.info("viewer url:------------------"+viewerUrl1); 
+       
+      return viewerUrl1;
+    }
+        
+    
+    private Integer getItemId(String handle) throws IOException
+    {
+    	DSpaceObject dso = null;
+        HttpServletRequest request = (HttpServletRequest) pageContext.getRequest();   
+        Integer item_id=0;
+        try
+        {
+            Context context = UIUtil.obtainContext(request);
+        	if (handle != null)
+            {
+                dso = HandleManager.resolveToObject(context, handle);                   	
+        	Item item = (Item) dso;   
+        	item_id=item.getID();        	            		
+            } 
+         
+        }
+        catch(SQLException sqle)
+        {
+        	throw new IOException(sqle.getMessage(), sqle);
+        }                
+              
+      return item_id;
+    }
+    
+    private Boolean isMoreFiles(String handle ) throws IOException
+    {
+    	DSpaceObject dso = null;
+    	Boolean filesExist = false;     	  
+        HttpServletRequest request = (HttpServletRequest) pageContext.getRequest();   
+        Integer item_id=0;
+        try
+        {
+            Context context = UIUtil.obtainContext(request);
+        	if (handle != null)
+            {
+                dso = HandleManager.resolveToObject(context, handle);                   	
+        	Item item = (Item) dso;   
+        	item_id=item.getID();
+        	Bundle[] bundles = item.getBundles("ORIGINAL");       	   
+           	
+            		for (int i = 0; i < bundles.length; i++)
+            		{
+            			Bitstream[] bitstreams = bundles[i].getBitstreams();
+            			log.info("file size:-------------->"+bitstreams.length);
+            			if(bitstreams.length>1){
+            				filesExist=true;
+            			}
+
+                	}
+            } 
+         
+        }
+        catch(SQLException sqle)
+        {
+        	throw new IOException(sqle.getMessage(), sqle);
+        }                
+              
+      return filesExist;
+    }
+    
     public int getAuthorLimit()
     {
         return authorLimit;

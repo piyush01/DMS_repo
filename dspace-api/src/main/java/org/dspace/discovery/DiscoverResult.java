@@ -7,6 +7,7 @@
  */
 package org.dspace.discovery;
 
+import org.apache.log4j.Logger;
 import org.dspace.content.DSpaceObject;
 
 import java.util.*;
@@ -28,6 +29,7 @@ public class DiscoverResult {
     private int searchTime;
     private Map<String, DSpaceObjectHighlightResult> highlightedResults;
     private String spellCheckQuery;
+    private static Logger log = Logger.getLogger(DiscoverResult.class);
 
 
     public DiscoverResult() {

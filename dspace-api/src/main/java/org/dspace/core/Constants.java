@@ -136,10 +136,12 @@ public class Constants
     /**
      * lets you look up action names from the action IDs
      */
-    public static final String[] actionText = { "READ", "WRITE",
+    public static final String[] actionText = { "READ", "MODIFY",
             "OBSOLETE (DELETE)", "ADD", "REMOVE", "WORKFLOW_STEP_1",
             "WORKFLOW_STEP_2", "WORKFLOW_STEP_3", "WORKFLOW_ABORT",
-            "DEFAULT_BITSTREAM_READ", "DEFAULT_ITEM_READ", "ADMIN" };
+            "DEFAULT_FILE_READ", "DEFAULT_DOCUMENT_READ", "ADMIN" };
+   
+   
 
     /**
      * generating constants for the relevance array dynamically is simple: just

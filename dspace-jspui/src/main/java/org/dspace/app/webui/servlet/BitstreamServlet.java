@@ -70,6 +70,11 @@ public class BitstreamServlet extends DSpaceServlet
     	Bitstream bitstream = null;
 
         // Get the ID from the URL
+    	String isCheck_out="";
+    	 isCheck_out=request.getParameter("ischeck_out") == null? "":request.getParameter("ischeck_out");
+    	 
+    	 log.info("isCheck_out-----value-------------"+isCheck_out);
+    	    	
         String idString = request.getPathInfo();
         String handle = "";
         String sequenceText = "";
@@ -154,7 +159,7 @@ public class BitstreamServlet extends DSpaceServlet
                 }
             }
         }
-
+   
         if (bitstream == null || filename == null
                 || !filename.equals(bitstream.getName()))
         {
@@ -218,6 +223,13 @@ public class BitstreamServlet extends DSpaceServlet
 			UIUtil.setBitstreamDisposition(bitstream.getName(), request, response);
 		}
 
+		
+		if(isCheck_out!=null && !isCheck_out.equals(""))
+		{
+			log.info("isCheck_out no:--------------------"+isCheck_out);
+			bitstream.checkOutBitstream(context,isCheck_out,bitstream.getID());
+		}
+		
         //DO NOT REMOVE IT - WE NEED TO FREE DB CONNECTION TO AVOID CONNECTION POOL EXHAUSTION FOR BIG FILES AND SLOW DOWNLOADS
         context.complete();
 

@@ -16,6 +16,7 @@ import org.dspace.authorize.ResourcePolicy;
 import org.dspace.content.*;
 import org.dspace.core.Constants;
 import org.dspace.core.Context;
+import org.dspace.eperson.EPerson;
 import org.dspace.eperson.Group;
 
 /**
@@ -46,7 +47,7 @@ public class PolicySet
         int contenttype = Integer.parseInt(argv[2]);
         int actionID = Integer.parseInt(argv[3]);
         int groupID = Integer.parseInt(argv[4]);
-
+        int userID =Integer.parseInt(argv[5]);
         boolean isReplace = false;
         String command = argv[5];
         String filter = null;
@@ -69,7 +70,7 @@ public class PolicySet
         // carnage begins here
         //////////////////////
         setPoliciesFilter(c, containertype, containerID, contenttype, actionID,
-                groupID, isReplace, false, filter);
+                groupID,userID, isReplace, false, filter);
 
         c.complete();
         System.exit(0);
@@ -103,11 +104,11 @@ public class PolicySet
      *             if current user is not authorized to change these policies
      */
     public static void setPolicies(Context c, int containerType,
-                                   int containerID, int contentType, int actionID, int groupID,
+                                   int containerID, int contentType, int actionID, int groupID,int userId,
                                    boolean isReplace, boolean clearOnly) throws SQLException,
             AuthorizeException
     {
-        setPoliciesFilter(c, containerType,containerID, contentType, actionID, groupID, isReplace, clearOnly, null, null, null, null, null);
+        setPoliciesFilter(c, containerType,containerID, contentType, actionID, groupID,userId, isReplace, clearOnly, null, null, null, null, null);
     }
 
 
@@ -129,12 +130,12 @@ public class PolicySet
      * @throws AuthorizeException
      */
     public static void setPolicies(Context c, int containerType,
-                                   int containerID, int contentType, int actionID, int groupID,
+                                   int containerID, int contentType, int actionID, int groupID,int userId,
                                    boolean isReplace, boolean clearOnly,
                                    String name, String description, Date startDate, Date endDate) throws SQLException, AuthorizeException
     {
         setPoliciesFilter(c, containerType, containerID, contentType,
-                actionID, groupID, isReplace, clearOnly, null, name, description, startDate, endDate);
+                actionID, groupID,userId, isReplace, clearOnly, null, name, description, startDate, endDate);
     }
 
     /**
@@ -167,10 +168,10 @@ public class PolicySet
      *             if current user is not authorized to change these policies
      */
     public static void setPoliciesFilter(Context c, int containerType,
-                                         int containerID, int contentType, int actionID, int groupID,
+                                         int containerID, int contentType, int actionID, int groupID,int userId,
                                          boolean isReplace, boolean clearOnly, String filter) throws SQLException,AuthorizeException
     {
-        setPoliciesFilter(c, containerType,containerID, contentType, actionID, groupID, isReplace, clearOnly, filter, null, null, null, null);
+        setPoliciesFilter(c, containerType,containerID, contentType, actionID, groupID,userId, isReplace, clearOnly, filter, null, null, null, null);
     }
 
     /**
@@ -207,7 +208,7 @@ public class PolicySet
      *             if current user is not authorized to change these policies
      */
     public static void setPoliciesFilter(Context c, int containerType,
-                                         int containerID, int contentType, int actionID, int groupID,
+                                         int containerID, int contentType, int actionID, int groupID,int userId,
                                          boolean isReplace, boolean clearOnly, String filter,
                                          String name, String description, Date startDate, Date endDate) throws SQLException, AuthorizeException
     {
@@ -215,7 +216,7 @@ public class PolicySet
         {
             Collection collection = Collection.find(c, containerID);
             Group group = Group.find(c, groupID);
-
+            EPerson user=EPerson.find(c, userId);
             ItemIterator i = collection.getItems();
             try
             {
@@ -243,7 +244,7 @@ public class PolicySet
                                 rp.setResource(myitem);
                                 rp.setAction(actionID);
                                 rp.setGroup(group);
-
+                                rp.setEPerson(user);
                                 rp.setRpName(name);
                                 rp.setRpDescription(description);
                                 rp.setStartDate(startDate);
@@ -284,7 +285,7 @@ public class PolicySet
                                     rp.setResource(bundle);
                                     rp.setAction(actionID);
                                     rp.setGroup(group);
-
+                                    rp.setEPerson(user);
                                     rp.setRpName(name);
                                     rp.setRpDescription(description);
                                     rp.setStartDate(startDate);
@@ -336,7 +337,7 @@ public class PolicySet
                                             rp.setResource(bitstream);
                                             rp.setAction(actionID);
                                             rp.setGroup(group);
-
+                                            rp.setEPerson(user);
                                             rp.setRpName(name);
                                             rp.setRpDescription(description);
                                             rp.setStartDate(startDate);

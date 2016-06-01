@@ -87,6 +87,7 @@ public class BrowseItem extends DSpaceObject
 	public Metadatum[] getMetadata(String schema, String element, String qualifier, String lang) {
         try
         {
+        	
             BrowseItemDAO dao = BrowseDAOFactory.getItemInstance(ourContext);
 
             // if the qualifier is a wildcard, we have to get it out of the

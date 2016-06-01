@@ -105,7 +105,7 @@ public class SelectGroupTag extends TagSupport
 			HttpServletRequest req = (HttpServletRequest) pageContext.getRequest();
 			
 			out.print("<select class=\"form-control\" multiple=\"multiple\" name=\"group_ids\" size=\"");
-			out.print(multiple ? "10" : "1");
+			out.print(multiple ? "5" : "1");
 			out.println("\">");
             
 			//ensure that if no group is selected that a blank option is displayed - xhtml compliance 
@@ -140,7 +140,7 @@ public class SelectGroupTag extends TagSupport
                                 + "\" onclick=\"javascript:removeSelected(window.document.epersongroup.group_ids);\"/>");
 			}
             
-            out.print("<input class=\"btn btn-primary pull-right\" type=\"button\" value=\"" + p 
+            out.print(" &nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input class=\"btn btn-primary\" type=\"button\" value=\"" + p 
                             + "\" onclick=\"javascript:popup_window('"
                             + req.getContextPath() + "/tools/group-select-list?multiple=" 
                             + multiple + "', 'group_popup');\" />");

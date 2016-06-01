@@ -605,9 +605,9 @@ public class AuthorizeManager
     public static List<ResourcePolicy> getPolicies(Context c, DSpaceObject o)
             throws SQLException
     {
-        TableRowIterator tri = DatabaseManager.queryTable(c, "resourcepolicy",
-                "SELECT * FROM resourcepolicy WHERE resource_type_id= ? AND resource_id= ? ",
-                o.getType(), o.getID());
+        TableRowIterator tri = DatabaseManager.queryTable(c, "resourcepolicy","SELECT * FROM resourcepolicy WHERE resource_type_id= ? AND resource_id= ? ", o.getType(), o.getID());
+                
+               
 
         List<ResourcePolicy> policies = new ArrayList<ResourcePolicy>();
 

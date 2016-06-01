@@ -1,0 +1,38 @@
+Name :- RAJESH KUMAR
+Joint Holder :- -
+CAPITAL BUSINESS SYSTEMS PVT LTD
+G-13 UDYOG NAGAR INDUSTRIAL AREA PEERAGARHI
+NEW DELHI-110041
+DELHI
+Currency :- INR
+Statement of Account No - 915010047516779 for the period (From : 12-09-2015 To : 12-10-2015)
+
+Tran Date          CHQNO                             Particulars                                                DR          CR                        Balance           SOL          
+09-10-2015          -               BRN-SALARYPAYMENT-BYSALARY                                                          30067.00                      30067.00          101
+
+
+Unless the constituent notifies the bank immediately of any discrepancy found by him/her in this statement of Account, it will be taken that he/she has found the account correct. 
+The closing balance as shown/displayed includes not only the credit balance and / or overdraft limit, but also funds which are under clearing. 
+It excludes the amount marked as lien, if any. Hence the closing balance displayed may not be the effective available balance. For any further clarifications, please contact the Branch. 
+We would like to reiterate that, as a policy, Axis Bank does not ask you to part with/disclose/revalidate of your iConnect passord,login id and debit card number through emails OR phone call 
+Further, we would like to reiterate that Axis Bank shall not be liable for any losses arising from you sharing/disclosing of your login id, password and debit card number to anyone. Please co-operate by forwarding all such suspicious/spam emails, if received by you, to customer.service@axisbank.com 
+
+REGISTERED OFFICE - AXIS BANK LTD,TRISHUL,Opp. Samartheswar Temple, Near Law Garden, Ellisbridge,    Ahmedabad . 380006.
+This is a system generated output and requires no signature.
+
+Legend : 
+ICONN 	 Transaction trough Internet Banking 
+VMT-ICON 	 Visa Money Transfer through Internet Banking 
+AUTOSWEEP 	 Transfer to linked fixed deposit 
+REV SWEEP 	 Interest on Linked fixed Deposit 
+SWEEP TRF 	 Transfer from Linked Fixed Deposit / Account 
+VMT 	 Visa Money Transfer through ATM 
+CWDR 	 Cash Withdrawal through ATM 
+PUR 	 POS purchase 
+TIP/ SCG 	 Surcharge on usage of debit card at pumps/railway ticket purchase or hotel tips 
+RATE.DIFF 	 Difference in rates on usage of card internationally 
+CLG 	 Cheque Clearing Transaction 
+EDC 	 Credit transaction through EDC Machine 
+SETU 	 Seamless electronic fund transfer through AXIS Bank 
+Int.pd 	 Interest paid to customer 
+Int.Coll 	 Interest collected from the customer 

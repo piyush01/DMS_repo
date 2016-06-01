@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?><project-modules id="moduleCoreId" project-version="1.5.0">
+    <wb-module deploy-name="dspace-5.4-src-release">
+        <wb-resource deploy-path="/" source-path="/WebContent" tag="defaultRootSource"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/src"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/dspace-jspui/src/main/java"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/dspace-api/src/main/java"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/dspace-services/src/main/java"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/dspace-rest/src/main/java"/>
+        <property name="context-root" value="dspace-5.4-src-release"/>
+        <property name="java-output-path" value="/dspace-5.4-src-release/bin"/>
+    </wb-module>
+</project-modules>

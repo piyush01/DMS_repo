@@ -20,8 +20,10 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.dspace.core.ConfigurationManager;
 import org.dspace.core.Constants;
+import org.dspace.discovery.DiscoverResult;
 import org.dspace.sort.SortOption;
 import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
 
 /**
  * Contains the arguments for a query. Fill it out and pass to the query engine
@@ -51,6 +53,7 @@ public class QueryArgs
 
     /** number of metadata elements to display before truncating using "et al" */
     private int etAl = ConfigurationManager.getIntProperty("webui.itemlist.author-limit");
+    private static Logger log = Logger.getLogger(QueryArgs.class);
 
     /**
      * @return  the number of metadata fields at which to truncate with "et al"
@@ -174,6 +177,7 @@ public class QueryArgs
         {
             numFieldStr = "3";
         }
+        
         int numField = Integer.parseInt(numFieldStr);
         List<String> query = new ArrayList<String>();
         List<String> field = new ArrayList<String>();
@@ -223,11 +227,15 @@ public class QueryArgs
         	newquery = newquery + buildQueryPart(query_curr,field_curr);
         	if (iconj.hasNext())
         	{
-        		conj_curr = " " + iconj.next() + " ";
+        		conj_curr = "+" + iconj.next() + "+";
+        		log.info("conj_curr:------------->"+iconj.next());
         	}
+        	log.info("conj_curr:------------->"+conj_curr);
+        	
         }
         
         newquery = newquery + ")";
+        log.info("newquery:------------->"+newquery);
         return (newquery);
     }
 

@@ -136,7 +136,6 @@ public class FeedbackServlet extends DSpaceServlet
             {
                 log.warn(LogManager.getHeader(context,
                         "error_mailing_feedback", ""), me);
-
                 JSPManager.showInternalError(request, response);
             }
         }

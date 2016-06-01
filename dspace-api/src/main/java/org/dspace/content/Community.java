@@ -29,6 +29,8 @@ import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.*;
 
+import javax.servlet.http.HttpServletResponse;
+
 /**
  * Class representing a community
  * <P>
@@ -217,13 +219,13 @@ public class Community extends DSpaceObject
 
         // create the default authorization policy for communities
         // of 'anonymous' READ
-        Group anonymousGroup = Group.find(context, 0);
+       /* Group anonymousGroup = Group.find(context, 0);
 
         ResourcePolicy myPolicy = ResourcePolicy.create(context);
         myPolicy.setResource(c);
         myPolicy.setAction(Constants.READ);
         myPolicy.setGroup(anonymousGroup);
-        myPolicy.update();
+        myPolicy.update();*/
 
         context.addEvent(new Event(Event.CREATE, Constants.COMMUNITY, c.getID(), 
                 c.handle, c.getIdentifiers(context)));
@@ -352,7 +354,17 @@ public class Community extends DSpaceObject
             {
                 TableRow row = tri.next();
 
-                // First check the cache
+             // First check the cache
+                Community aCommunity = (Community) context.fromCache(
+                        Community.class, row.getIntColumn("community_id"));
+                if (aCommunity == null) {
+                    aCommunity = new Community(context, row);
+                }
+                if (AuthorizeManager.authorizeActionBoolean(context,aCommunity,Constants.READ)) {
+                  topCommunities.add(aCommunity);
+                }
+                
+             /*   // First check the cache
                 Community fromCache = (Community) context.fromCache(
                         Community.class, row.getIntColumn("community_id"));
 
@@ -363,7 +375,7 @@ public class Community extends DSpaceObject
                 else
                 {
                     topCommunities.add(new Community(context, row));
-                }
+                }*/
             }
         }
         finally
@@ -591,8 +603,8 @@ public class Community extends DSpaceObject
             ourContext.turnOffAuthorisationSystem();
             admins = Group.create(ourContext);
             ourContext.restoreAuthSystemState();
-            
-            admins.setName("COMMUNITY_" + getID() + "_ADMIN");
+            Community community=find(ourContext,getID());
+            admins.setName(community.getMetadata("name") + "_ADMIN");
             admins.update();
         }
 
@@ -685,7 +697,17 @@ public class Community extends DSpaceObject
             {
                 TableRow row = tri.next();
 
-                // First check the cache
+             // First check the cache
+                Collection aCollection = (Collection) ourContext.fromCache(
+                        Collection.class, row.getIntColumn("collection_id"));
+                if (aCollection == null) {
+                   aCollection = new Collection(ourContext, row);
+                }
+                if (AuthorizeManager.authorizeActionBoolean(ourContext,aCollection,Constants.READ)) {
+                  collections.add(aCollection);
+                }
+                
+              /*  // First check the cache
                 Collection fromCache = (Collection) ourContext.fromCache(
                         Collection.class, row.getIntColumn("collection_id"));
 
@@ -696,7 +718,7 @@ public class Community extends DSpaceObject
                 else
                 {
                     collections.add(new Collection(ourContext, row));
-                }
+                }*/
             }
         }
         finally
@@ -759,7 +781,17 @@ public class Community extends DSpaceObject
             {
                 TableRow row = tri.next();
 
-                // First check the cache
+             // First check the cache
+                Community aCommunity = (Community) ourContext.fromCache(
+                        Community.class, row.getIntColumn("community_id"));
+                if (aCommunity == null) {
+                    aCommunity = new Community(ourContext, row);
+                }
+                if (AuthorizeManager.authorizeActionBoolean(ourContext,aCommunity,Constants.READ)) {
+                  subcommunities.add(aCommunity);
+                }
+                
+              /*  // First check the cache
                 Community fromCache = (Community) ourContext.fromCache(
                         Community.class, row.getIntColumn("community_id"));
 
@@ -770,7 +802,7 @@ public class Community extends DSpaceObject
                 else
                 {
                     subcommunities.add(new Community(ourContext, row));
-                }
+                }*/
             }
         }
         finally
@@ -1457,6 +1489,30 @@ public class Community extends DSpaceObject
             return null;
         }       
     }
+    
+    public static void setFolderXml(HttpServletResponse response, Community[] subcommunities)
+    {
+		try {
+			StringBuilder content = new StringBuilder();
+			response.setContentType("text/xml; charset=utf-8");
+			response.setHeader("Cache-Control", "no-cache");			
+			content.append("<main>");
+			for(int i=0; i<subcommunities.length; i++)
+			{
+				//FolderBean fb=(FolderBean)it.next();
+				content.append("<id>"+subcommunities[i].getID()+"</id>");
+				content.append("<name>"+subcommunities[i].getName()+"</name>");
+				log.info("Folder name in setFolderXml method============>"+subcommunities[i].getName()+"ID======>"+subcommunities[i].getID());
+			}
+			content.append("</main>");
+			response.getWriter().write(content.toString());
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("Exception in creating xml:" + e.getMessage());
+		}
+		
+	}
+   
 
     @Override
     public void updateLastModified()

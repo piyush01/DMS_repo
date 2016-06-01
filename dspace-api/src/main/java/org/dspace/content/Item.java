@@ -203,7 +203,6 @@ public class Item extends DSpaceObject
     public static ItemIterator findAll(Context context) throws SQLException
     {
         String myQuery = "SELECT * FROM item WHERE in_archive='1'";
-
         TableRowIterator rows = DatabaseManager.queryTable(context, "item", myQuery);
 
         return new ItemIterator(context, rows);
@@ -1067,6 +1066,97 @@ public class Item extends DSpaceObject
                     streams[k].setSequenceID(sequence);
                     sequence++;
                     streams[k].update();
+                    modified = true;
+                }
+            }
+        }
+
+        if (modifiedMetadata || modified)
+        {
+            // Set the last modified date
+            itemRow.setColumn("last_modified", new Date());
+
+            // Make sure that withdrawn and in_archive are non-null
+            if (itemRow.isColumnNull("in_archive"))
+            {
+                itemRow.setColumn("in_archive", false);
+            }
+
+            if (itemRow.isColumnNull("withdrawn"))
+            {
+                itemRow.setColumn("withdrawn", false);
+            }
+
+            if (itemRow.isColumnNull("discoverable"))
+            {
+                itemRow.setColumn("discoverable", false);
+            }
+
+
+            DatabaseManager.update(ourContext, itemRow);
+
+            if (modifiedMetadata) {
+                updateMetadata();
+                clearDetails();
+            }
+
+            ourContext.addEvent(new Event(Event.MODIFY, Constants.ITEM, getID(), 
+                    null, getIdentifiers(ourContext)));
+            modified = false;
+        }
+    }
+	
+/**
+     * Update the item "in archive" flag and Dublin Core metadata in the
+     * database
+     * No authorisation
+     * @throws SQLException
+     * @throws AuthorizeException
+     */
+    public void updateunauthorise() throws SQLException, AuthorizeException
+    {
+        // Check authorisation
+        // only do write authorization if user is not an editor
+       /* if (!canEdit())
+        {
+            AuthorizeManager.authorizeAction(ourContext, this, Constants.WRITE);
+        }*/
+
+        log.info(LogManager.getHeader(ourContext, "update_item", "item_id="
+                + getID()));
+
+        // Set sequence IDs for bitstreams in item
+        int sequence = 0;
+        Bundle[] bunds = getBundles();
+
+        // find the highest current sequence number
+        for (int i = 0; i < bunds.length; i++)
+        {
+            Bitstream[] streams = bunds[i].getBitstreams();
+
+            for (int k = 0; k < streams.length; k++)
+            {
+                if (streams[k].getSequenceID() > sequence)
+                {
+                    sequence = streams[k].getSequenceID();
+                }
+            }
+        }
+
+        // start sequencing bitstreams without sequence IDs
+        sequence++;
+
+        for (int i = 0; i < bunds.length; i++)
+        {
+            Bitstream[] streams = bunds[i].getBitstreams();
+
+            for (int k = 0; k < streams.length; k++)
+            {
+                if (streams[k].getSequenceID() < 0)
+                {
+                    streams[k].setSequenceID(sequence);
+                    sequence++;
+                    streams[k].updateunauthorize();
                     modified = true;
                 }
             }

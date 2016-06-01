@@ -7,11 +7,16 @@
  */
 package org.dspace.eperson;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
+import javax.servlet.http.HttpServletRequest;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Option;
@@ -58,6 +63,12 @@ public class EPerson extends DSpaceObject
     /** The e-mail field (for sorting) */
     public static final int LANGUAGE = 5;
     
+    /*===============================================================================*/
+    public static final int STATUS = 6;
+    
+    public static final int GROUP_ID = 7;
+    /*================================================================================*/
+
     /** log4j logger */
     private static final Logger log = Logger.getLogger(EPerson.class);
 
@@ -513,7 +524,7 @@ public class EPerson extends DSpaceObject
 
         // NOTE: The use of 's' in the order by clause can not cause an SQL
         // injection because the string is derived from constant values above.
-        TableRowIterator rows = DatabaseManager.query(context, "SELECT * FROM eperson e ORDER BY ?",s);
+        TableRowIterator rows = DatabaseManager.query(context, "SELECT * FROM eperson e where e.can_log_in='true' and status='a' ORDER BY ?",s);
         if(!t.equals("")) {
             rows = DatabaseManager.query(context,
                     "SELECT * FROM eperson e " +
@@ -574,8 +585,7 @@ public class EPerson extends DSpaceObject
         // authorized?
         if (!AuthorizeManager.isAdmin(context))
         {
-            throw new AuthorizeException(
-                    "You must be an admin to create an EPerson");
+            throw new AuthorizeException("You must be an admin to create an EPerson");
         }
 
         // Create a table row
@@ -583,15 +593,12 @@ public class EPerson extends DSpaceObject
 
         EPerson e = new EPerson(context, row);
 
-        log.info(LogManager.getHeader(context, "create_eperson", "eperson_id="
-                + e.getID()));
+        log.info(LogManager.getHeader(context, "create_eperson", "eperson_id="+ e.getID()));
 
-        context.addEvent(new Event(Event.CREATE, Constants.EPERSON, e.getID(), 
-                null, e.getIdentifiers(context)));
+        context.addEvent(new Event(Event.CREATE, Constants.EPERSON, e.getID(),null, e.getIdentifiers(context)));
 
         return e;
     }
-
     /**
      * Delete an eperson
      * 
@@ -715,7 +722,86 @@ public class EPerson extends DSpaceObject
         myRow.setColumn("email", s);
         modified = true;
     }
+   /* =============================================================================================*/
+    public String getStatus()
+    {
+        return myRow.getStringColumn("status");
+    }
+    public void setStatus(String s)
+    {
+    	 if (s != null)
+         {
+             s = s.toLowerCase();
+         }
+    	 myRow.setColumn("status", s);
+         modified = true;
+    }
+    public void setSuperiorEmail(String s)
+    {
+        if (s != null)
+        {
+            s = s.toLowerCase();
+        }
 
+        myRow.setColumn("superior_email", s);
+        modified = true;
+    }
+    public String getSuperiorEmail()
+    {
+    	return myRow.getStringColumn("superior_email");
+    }
+    public void setSuperiorName(String s)
+    {
+        /*if (s != null)
+        {
+            s = s.toLowerCase();
+        }*/
+
+        myRow.setColumn("superior_name", s);
+        modified = true;
+    }
+    public String getSuperiorName()
+    {
+    	return myRow.getStringColumn("superior_name");
+    }
+    public void setUserDesignation(String s)
+    {
+    	 if (s != null)
+         {
+             s = s.toLowerCase();
+         }
+    	 myRow.setColumn("user_designation", s);
+         modified = true;
+    }
+    public String getUserDesignation()
+    {
+    	return myRow.getStringColumn("user_designation");
+    }
+    public void setepersongroup2eperson(int epersionid,int epersongroupid) throws SQLException
+    {
+    	TableRow mappingRow = DatabaseManager.row("epersongroup2eperson");
+        mappingRow.setColumn("eperson_id",epersionid);
+        mappingRow.setColumn("eperson_group_id", epersongroupid);
+        DatabaseManager.insert(ourContext, mappingRow);
+        modified = true;
+    }
+    public int getepersongroup2eperson() throws SQLException
+    {
+    	TableRow mappingRow = DatabaseManager.row("epersongroup2eperson");
+    	//mappingRow.getIntColumn("eperson_id");
+    	return mappingRow.getIntColumn("eperson_group_id");
+    }
+  /* public void setgroup_id(int a)
+   {
+  	 myRow.setColumn("group_id", a);
+       modified = true;
+	   
+   }
+   public int getgroup_id()
+   {
+	   return myRow.getIntColumn("group_id"); 
+   }*/
+ /* =================================================================================================*/
     /**
      * Get the e-person's netid
      * 
@@ -914,13 +1000,17 @@ public class EPerson extends DSpaceObject
      */
     public void setPassword(String s)
     {
+    	
         PasswordHash hash = new PasswordHash(s);
         myRow.setColumn("password", Utils.toHex(hash.getHash()));
         myRow.setColumn("salt", Utils.toHex(hash.getSalt()));
         myRow.setColumn("digest_algorithm", hash.getAlgorithm());
         modified = true;
     }
-
+    public String getPassword()
+    {
+    	 return myRow.getStringColumn("password");
+    }
     /**
      * Set the EPerson's password hash.
      * 

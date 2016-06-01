@@ -114,7 +114,8 @@ public class Authenticate
         {
             // If for some reason we don't have the original URL, redirect
             // to My DSpace
-            originalURL = request.getContextPath() + "/mydspace";
+            originalURL = request.getContextPath() + "/";
+           // originalURL = request.getContextPath() + "/mydspace";
         }
         else
         {

@@ -8,12 +8,16 @@
 package org.dspace.app.webui.servlet;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.SQLException;
 import java.util.Enumeration;
 import java.util.ArrayList;
@@ -26,6 +30,9 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.fileupload.FileUploadBase.FileSizeLimitExceededException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
+import org.dspace.app.itemexport.ItemExport;
+import org.dspace.app.itemimport.BatchUpload;
+import org.dspace.app.itemimport.ItemImport;
 import org.dspace.app.util.SubmissionInfo;
 import org.dspace.app.util.SubmissionStepConfig;
 import org.dspace.app.webui.submit.JSPStepManager;
@@ -36,16 +43,25 @@ import org.dspace.app.webui.util.UIUtil;
 import org.dspace.authorize.AuthorizeException;
 import org.dspace.content.Bitstream;
 import org.dspace.content.Bundle;
+import org.dspace.content.SupervisedItem;
 import org.dspace.content.WorkspaceItem;
 import org.dspace.core.ConfigurationManager;
 import org.dspace.core.Context;
 import org.dspace.core.LogManager;
+import org.dspace.eperson.EPerson;
+import org.dspace.eperson.Group;
 import org.dspace.workflow.WorkflowItem;
+import org.dspace.workflow.WorkflowManager;
+import org.dspace.workflowmanager.WorkflowStepManager;
+import org.dspace.workflowprocess.WorkflowProcessManager;
 import org.dspace.submit.AbstractProcessingStep;
 
 import com.google.gson.Gson;
+
 import java.util.Collections;
+
 import javax.servlet.http.HttpSession;
+
 import org.dspace.submit.step.UploadStep;
 
 /**
@@ -122,6 +138,30 @@ public class SubmissionController extends DSpaceServlet
             .getLogger(SubmissionController.class);
 
     
+  //*start from MyDSpaceServlet.java
+    private WorkflowProcessManager workflowProcessManager=new WorkflowProcessManager();
+    private WorkflowStepManager workflowStepManager=new WorkflowStepManager();
+    
+    
+    public WorkflowStepManager getWorkflowStepManager() {
+		return workflowStepManager;
+	}
+
+	public void setWorkflowStepManager(WorkflowStepManager workflowStepManager) {
+		this.workflowStepManager = workflowStepManager;
+	}
+
+	public WorkflowProcessManager getWorkflowProcessManager() {
+		return workflowProcessManager;
+	}
+
+	public void setWorkflowProcessManager(
+			WorkflowProcessManager workflowProcessManager) {
+		this.workflowProcessManager = workflowProcessManager;
+	}
+	//*end from MyDSpaceServlet.java
+	
+    
     protected void doDSGet(Context context, HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException,
             SQLException, AuthorizeException
@@ -138,7 +178,15 @@ public class SubmissionController extends DSpaceServlet
          * With no parameters, doDSGet() just calls doDSPost(), which continues
          * the current submission (if one exists in the Request), or creates a
          * new submission (if no existing submission can be found).
-         */
+         */    	   
+    	
+    	//*from MyDSpaceServlet.java
+    	// GET displays the main page - everthing else is a POST 
+    	  int totId=workflowProcessManager.getSupervisorDetails(context);
+   	   request.setAttribute("totId", totId);
+   	    //*end from MyDSpaceServlet.java
+   	   
+   	   
 
         // try to get a workspace ID or workflow ID
         String workspaceID = request.getParameter("resume");
@@ -222,6 +270,7 @@ public class SubmissionController extends DSpaceServlet
         }
         else
         {
+        	log.info("start here sumbit controller:-------->");
             // otherwise, forward to doDSPost() to do usual processing
             doDSPost(context, request, response);
         }
@@ -232,31 +281,31 @@ public class SubmissionController extends DSpaceServlet
             HttpServletResponse response) throws ServletException, IOException,
             SQLException, AuthorizeException
     {
+    	
     	// Configuration of current step in Item Submission Process
-        SubmissionStepConfig currentStepConfig;
-        
+        SubmissionStepConfig currentStepConfig;        
         //need to find out what type of form we are dealing with
         String contentType = request.getContentType();
-
         // if multipart form, we have to wrap the multipart request
         // in order to be able to retrieve request parameters, etc.
-        if ((contentType != null)
-                && (contentType.indexOf("multipart/form-data") != -1))
+                
+         log.info("uploda file:--1>"+contentType);        
+                
+        if ((contentType != null) && (contentType.indexOf("multipart/form-data") != -1))                
         {
             try
             {
-                    request = wrapMultipartRequest(request);
-                    
+                    request = wrapMultipartRequest(request);                    
                     // check if the POST request was send by resumable.js
-                    String resumableFilename = request.getParameter("resumableFilename");
-                    
+                    String resumableFilename = request.getParameter("resumableFilename");               
+                    log.info("uploda file:--2>"+resumableFilename);
                     if (!StringUtils.isEmpty(resumableFilename))
                     {
-                        log.debug("resumable Filename: '" + resumableFilename + "'.");
+                        log.info("resumable Filename: '" + resumableFilename + "'.");
                         File completedFile = null;
                         try
                         {
-                            log.debug("Starting doPostResumable method.");
+                            log.info("Starting doPostResumable method.");
                             completedFile = doPostResumable(request);
                         } catch(IOException e){
                             // we were unable to receive the complete chunk => initialize reupload
@@ -266,18 +315,20 @@ public class SubmissionController extends DSpaceServlet
                         if (completedFile == null)
                         {
                             // if a part/chunk was uploaded, but the file is not completly uploaded yet
-                            log.debug("Got one file chunk, but the upload is not completed yet.");
+                            log.info("Got one file chunk, but the upload is not completed yet.");
                             return;
                         }
                         else
                         {
                             // We got the complete file. Assemble it and store
                             // it in the repository.
-                            log.debug("Going to assemble file chunks.");
+                            log.info("Going to assemble file chunks.");
 
                             if (completedFile.length() > 0)
                             {
+                            	
                                 String fileName = completedFile.getName();
+                                log.info("fileName:-"+fileName);
                                 String filePath = tempDir + File.separator + fileName;
                                 // Read the temporary file
                                 InputStream fileInputStream = 
@@ -299,7 +350,7 @@ public class SubmissionController extends DSpaceServlet
                                 // cleanup our temporary file
                                 if (!completedFile.delete())
                                 {
-                                    log.error("Unable to delete temporary file " + filePath);
+                                    log.info("Unable to delete temporary file " + filePath);
                                 }
 
                                 // We already assembled the complete file.
@@ -308,6 +359,7 @@ public class SubmissionController extends DSpaceServlet
                                 // handling realy easy:
                                 if (uploadResult != UploadStep.STATUS_COMPLETE)
                                 {
+                                	 log.info("STATUS_COMPLETE");
                                     response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                                     return;
                                 }
@@ -337,9 +389,10 @@ public class SubmissionController extends DSpaceServlet
                 }
                 return;
             }
-            
+            log.info("uploadFiles:--->");
             //also, upload any files and save their contents to Request (for later processing by UploadStep)
             uploadFiles(context, request);
+            log.info("uploadFiles: exist--->");
         }
         
         // Reload submission info from request parameters
@@ -348,6 +401,8 @@ public class SubmissionController extends DSpaceServlet
         // a submission info object is necessary to continue
         if (subInfo == null)
         {
+        	log.info("submit:--1");
+        	
             // Work around for problem where people select "is a thesis", see
             // the error page, and then use their "back" button thinking they
             // can start another submission - it's been removed so the ID in the
@@ -374,6 +429,7 @@ public class SubmissionController extends DSpaceServlet
         // First, check for a click on "Cancel/Save" button.
         if (UIUtil.getSubmitButton(request, "").equals(AbstractProcessingStep.CANCEL_BUTTON))
         {
+        	log.info("submit:--2");
         	// Get the current step
             currentStepConfig = getCurrentStepConfig(request, subInfo);
             
@@ -387,6 +443,7 @@ public class SubmissionController extends DSpaceServlet
         // to the "select collection" step.
         else if (subInfo.getSubmissionItem() == null)
         {
+        	log.info("submit:--3");
             // we have just started this submission
             // (or we have just resumed a saved submission)
 
@@ -396,6 +453,7 @@ public class SubmissionController extends DSpaceServlet
         else
         // otherwise, figure out the next Step to call!
         {
+        	log.info("submit:--4");
             // Get the current step
             currentStepConfig = getCurrentStepConfig(request, subInfo);
 
@@ -422,6 +480,7 @@ public class SubmissionController extends DSpaceServlet
             }
             else
             {
+            	log.info("submit:--5");
                 // by default, load step class to start 
                 // or continue its processing
                 doStep(context, request, response, subInfo, currentStepConfig.getStepNumber());
@@ -449,10 +508,9 @@ public class SubmissionController extends DSpaceServlet
             AuthorizeException
     {
     	SubmissionStepConfig currentStepConfig = null;
-    	
+    	log.info("submit:--5.1");
         if (subInfo.getSubmissionConfig() != null)
-        {
-            // get step to perform
+        {            // get step to perform
             currentStepConfig = subInfo.getSubmissionConfig().getStep(stepNumber);
         }
         else
@@ -464,10 +522,14 @@ public class SubmissionController extends DSpaceServlet
             JSPManager.showInternalError(request, response);
         }
 
+        log.info("submit:------------------------>>>>>>>>>>>"+currentStepConfig.getStepNumber());        
+        log.info("submit:-------------getStepReached(subInfo)----------->>>>>>>>>>>"+getStepReached(subInfo));
+        
         // if this is the furthest step the user has been to, save that info
         if (!subInfo.isInWorkflow() && (currentStepConfig.getStepNumber() > getStepReached(subInfo)))
         {
-            // update submission info
+        	log.info("submit:--5.2");
+        	// update submission info
             userHasReached(subInfo, currentStepConfig.getStepNumber());
             // commit changes to database
             context.commit();
@@ -489,10 +551,11 @@ public class SubmissionController extends DSpaceServlet
            
             //tell the step class to do its processing
             boolean stepFinished = stepManager.processStep(context, request, response, subInfo);
-            
+            log.info("submit:--5.3");
             //if this step is finished, continue to next step
             if(stepFinished)
             {
+            	log.info("submit:--5.4");
                 // If we finished up an upload, then we need to change
                 // the FileUploadRequest object back to a normal HTTPServletRequest
                 if(request instanceof FileUploadRequest)
@@ -502,12 +565,13 @@ public class SubmissionController extends DSpaceServlet
                 
                 //retrieve any changes to the SubmissionInfo object
                 subInfo = getSubmissionInfo(context, request);
-                
+                log.info("submit:--5.5");
                 //do the next step!
                 doNextStep(context, request, response, subInfo, currentStepConfig);
             }
             else
             {
+            	log.info("submit:--5.6");
                 //commit & close context
                 context.complete();
             }
@@ -537,6 +601,7 @@ public class SubmissionController extends DSpaceServlet
             throws ServletException, IOException, SQLException,
             AuthorizeException
     {
+    	log.info("submit:--6");
         // find current Step number
         int currentStepNum;
         if (currentStepConfig == null)
@@ -578,7 +643,83 @@ public class SubmissionController extends DSpaceServlet
                 saveSubmissionInfo(request, subInfo);
     
                 // forward to completion JSP
-                showProgressAwareJSP(request, response, subInfo, COMPLETE_JSP);
+              //  showProgressAwareJSP(request, response, subInfo, COMPLETE_JSP);
+                
+              //*from MyDSpaceServlet.java
+
+                log.info(LogManager.getHeader(context, "view_mydspace", ""));
+                EPerson currentUser = context.getCurrentUser();
+
+                // FIXME: WorkflowManager should return arrays
+                List<WorkflowItem> ownedList = WorkflowManager.getOwnedTasks(context, currentUser);
+                WorkflowItem[] owned = ownedList.toArray(new WorkflowItem[ownedList.size()]);
+
+                // Pooled workflow items
+                List<WorkflowItem> pooledList = WorkflowManager.getPooledTasks(context, currentUser);
+                WorkflowItem[] pooled = pooledList.toArray(new WorkflowItem[pooledList.size()]);
+
+                // User's WorkflowItems
+                WorkflowItem[] workflowItems = WorkflowItem.findByEPerson(context, currentUser);
+
+                // User's PersonalWorkspace
+                WorkspaceItem[] workspaceItems = WorkspaceItem.findByEPerson(context, currentUser);
+
+                // User's authorization groups
+                Group[] memberships = Group.allMemberGroups(context, currentUser);
+                
+                // Should the group memberships be displayed
+                boolean displayMemberships = ConfigurationManager.getBooleanProperty("webui.mydspace.showgroupmemberships", false);
+
+                SupervisedItem[] supervisedItems = SupervisedItem.findbyEPerson(
+                        context, currentUser);
+                // export archives available for download
+                List<String> exportArchives = null;
+                try{
+                	exportArchives = ItemExport.getExportsAvailable(currentUser);
+                }
+                catch (Exception e) {
+        			// nothing to do they just have no export archives available for download
+        		}
+                
+                // imports available for view
+                List<BatchUpload> importUploads = null;
+                try{
+                	importUploads = ItemImport.getImportsAvailable(currentUser);
+                }
+                catch (Exception e) {
+        			// nothing to do they just have no export archives available for download
+        		}
+                // Set attributes
+                request.setAttribute("mydspace.user", currentUser);
+                request.setAttribute("workspace.items", workspaceItems);
+                request.setAttribute("workflow.items", workflowItems);
+                request.setAttribute("workflow.owned", owned);
+                request.setAttribute("workflow.pooled", pooled);
+                request.setAttribute("group.memberships", memberships);
+                request.setAttribute("display.groupmemberships", Boolean.valueOf(displayMemberships));
+                request.setAttribute("supervised.items", supervisedItems);
+                request.setAttribute("export.archives", exportArchives);
+                request.setAttribute("import.uploads", importUploads);
+                request.setAttribute("submission.message" , Boolean.TRUE);
+                HttpSession session = request.getSession(false);
+                session.removeAttribute("version");
+                String msg="Document has been successfully submitted!";
+                JSPManager.showJSP(request, response, "/mydspace/main.jsp");
+                
+               /* HttpSession session = request.getSession(true);
+	               String handleid=(String)session.getAttribute("handleid");
+	               session.removeAttribute("handleid");                
+                 if(handleid!=null && !handleid.equals(""))
+                 {
+                  String msg="Document has been successfully submitted!";
+                   response.sendRedirect(request.getContextPath()+"/handle/"+handleid+"?message="+msg);
+                   return;
+                 }else
+                 {              
+                // Forward to main mydspace page
+                  JSPManager.showJSP(request, response, "/mydspace/main.jsp");
+                 }*/
+              //*end from MyDSpaceServlet.java
         
             }
         }
@@ -657,7 +798,7 @@ public class SubmissionController extends DSpaceServlet
         // If so, go backwards one step
         else if (currentStepNum > FIRST_STEP)
         {
-            
+        	log.info("submit:--7");
             currentStepConfig = getPreviousVisibleStep(request, subInfo);
             
             if(currentStepConfig != null)
@@ -904,8 +1045,8 @@ public class SubmissionController extends DSpaceServlet
         try
         {
             // call post-processing on Step (to save any inputs from JSP)
-            log
-                    .debug("Cancel/Save or Jump/Previous Request: calling processing for Step: '"
+            
+        log.debug("Cancel/Save or Jump/Previous Request: calling processing for Step: '"
                             + stepConfig.getProcessingClassName() + "'");
 
             try
@@ -954,6 +1095,7 @@ public class SubmissionController extends DSpaceServlet
             SubmissionInfo subInfo, SubmissionStepConfig currentStepConfig) throws ServletException, IOException,
             SQLException, AuthorizeException
     {
+    	log.info("submit:--8");
         String buttonPressed = UIUtil.getSubmitButton(request, "submit_back");
 
         if (buttonPressed.equals("submit_back"))
@@ -1009,6 +1151,7 @@ public class SubmissionController extends DSpaceServlet
             HttpServletResponse response, SubmissionInfo subInfo, String jspPath)
             throws ServletException, IOException
     {
+    	log.info("submit:--9");
         saveSubmissionInfo(request, subInfo);
 
         JSPManager.showJSP(request, response, jspPath);
@@ -1029,26 +1172,29 @@ public class SubmissionController extends DSpaceServlet
             HttpServletRequest request) throws SQLException, ServletException
     {
         SubmissionInfo info = null;
-        
+        log.info("SubmissionInfo : in--->");
         // Is full Submission Info in Request Attribute?
         if (request.getAttribute("submission.info") != null)
         {
+        	  log.info("SubmissionInfo : in--->1");
             // load from cache
             info = (SubmissionInfo) request.getAttribute("submission.info");
         }
         else
         {
-            
+        	 log.info("SubmissionInfo : in--->2");
             
             // Need to rebuild Submission Info from Request Parameters
             if (request.getParameter("workflow_id") != null)
             {
+            	 log.info("SubmissionInfo : in--->3");
                 int workflowID = UIUtil.getIntParameter(request, "workflow_id");
                 
                 info = SubmissionInfo.load(request, WorkflowItem.find(context, workflowID));
             }
             else if(request.getParameter("workspace_item_id") != null)
             {
+            	 log.info("SubmissionInfo : in--->4");
                 int workspaceID = UIUtil.getIntParameter(request,
                         "workspace_item_id");
                 
@@ -1056,6 +1202,7 @@ public class SubmissionController extends DSpaceServlet
             }
             else
             {
+            	 log.info("SubmissionInfo : in--->5");
                 //by default, initialize Submission Info with no item
                 info = SubmissionInfo.load(request, null);
             }
@@ -1065,6 +1212,7 @@ public class SubmissionController extends DSpaceServlet
             if ((getStepReached(info) > FIRST_STEP)
                     && (info.getSubmissionItem() == null))
             {
+            	 log.info("SubmissionInfo : in--->6");
                 log.warn(LogManager.getHeader(context,
                         "cannot_load_submission_info",
                         "InProgressSubmission is null!"));
@@ -1074,12 +1222,14 @@ public class SubmissionController extends DSpaceServlet
 
             if (request.getParameter("bundle_id") != null)
             {
+            	 log.info("SubmissionInfo : in--->6");
                 int bundleID = UIUtil.getIntParameter(request, "bundle_id");
                 info.setBundle(Bundle.find(context, bundleID));
             }
 
             if (request.getParameter("bitstream_id") != null)
             {
+            	 log.info("SubmissionInfo : in--->7");
                 int bitstreamID = UIUtil.getIntParameter(request,
                         "bitstream_id");
                 info.setBitstream(Bitstream.find(context, bitstreamID));
@@ -1104,6 +1254,7 @@ public class SubmissionController extends DSpaceServlet
     public static void saveSubmissionInfo(HttpServletRequest request,
             SubmissionInfo si)
     {
+    	 log.info("saveSubmissionInfo : in--->8");
         // save to request
         request.setAttribute("submission.info", si);
     }
@@ -1386,6 +1537,7 @@ public class SubmissionController extends DSpaceServlet
     private void userHasReached(SubmissionInfo subInfo, int step)
             throws SQLException, AuthorizeException, IOException
     {
+    	log.info("submit:--5.3");
         if (!subInfo.isInWorkflow() && subInfo.getSubmissionItem() != null)
         {
             WorkspaceItem wi = (WorkspaceItem) subInfo.getSubmissionItem();
@@ -1495,8 +1647,7 @@ public class SubmissionController extends DSpaceServlet
             throw new ServletException(e);
         }
     }
-    
-    
+          
     /**
      * Upload any files found on the Request or in assembledFiles, and save them back as 
      * Request attributes, for further processing by the appropriate user interface.
@@ -1519,19 +1670,22 @@ public class SubmissionController extends DSpaceServlet
             if (Class.forName("org.dspace.app.webui.util.FileUploadRequest")
                     .isInstance(request))
             {
+            	   log.info("uploda file:--3>");
                 wrapper = (FileUploadRequest) request;
             }
             else
             {
+            	  log.info("uploda file:--4>");
                 // Wrap multipart request to get the submission info
                 wrapper = new FileUploadRequest(request);
             }
             
-            log.debug("Did not recoginze resumable upload, falling back to "
+            log.info("Did not recoginze resumable upload, falling back to "
                     + "simple upload.");
             Enumeration fileParams = wrapper.getFileParameterNames();
             while (fileParams.hasMoreElements()) 
             {
+            	 log.info("uploda file:--5>");
                 String fileName = (String) fileParams.nextElement();
 
                 File temp = wrapper.getFile(fileName);
@@ -1539,12 +1693,13 @@ public class SubmissionController extends DSpaceServlet
                 //if file exists and has a size greater than zero
                 if (temp != null && temp.length() > 0) 
                 {
-                    // Read the temp file into an inputstream
+                	log.info("uploda file:--6>");
+                	// Read the temp file into an inputstream
                     fileInputStream = new BufferedInputStream(
                             new FileInputStream(temp));
 
                     filePath = wrapper.getFilesystemName(fileName);
-
+                    log.info("filePath:--------------->"+filePath);
                     // cleanup our temp file
                     if (!temp.delete()) 
                     {

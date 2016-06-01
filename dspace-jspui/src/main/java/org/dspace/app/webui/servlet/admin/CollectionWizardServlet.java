@@ -96,7 +96,16 @@ public class CollectionWizardServlet extends DSpaceServlet
          * For GET, all we should really get is a community_id parameter (DB ID
          * of community to add collection to). doDSPost handles this
          */
-        doDSPost(context, request, response);
+        //doDSPost(context, request, response);
+    	 int communityID = UIUtil.getIntParameter(request, "community_id");
+  	   EPerson eperson[]=EPerson.findAll(context,EPerson.ID);
+         Group groups[]=Group.findAll(context,Group.ID);
+         request.setAttribute("eperson",eperson);
+         request.setAttribute("groups",groups);
+         request.setAttribute("communityID",communityID);
+         log.info("community id in get method===========>"+communityID);
+      JSPManager.showJSP(request, response,"/dspace-admin/wizard-basicinfo.jsp");
+      context.complete();
     }
 
     protected void doDSPost(Context context, HttpServletRequest request,
@@ -116,7 +125,7 @@ public class CollectionWizardServlet extends DSpaceServlet
 
         // First, see if we have a multipart request
         // (the 'basic info' page which might include uploading a logo)
-        String contentType = request.getContentType();
+       /* String contentType = request.getContentType();
 
         if ((contentType != null)
                 && (contentType.indexOf("multipart/form-data") != -1))
@@ -125,11 +134,12 @@ public class CollectionWizardServlet extends DSpaceServlet
             processBasicInfo(context, request, response);
 
             return;
-        }
+        }*/
+    	  
+       
+     
 
-        int communityID = UIUtil.getIntParameter(request, "community_id");
-
-        if (communityID > -1)
+       /* if (communityID > -1)
         {
             // We have a community ID, "create new collection" button pressed
             Community c = Community.find(context, communityID);
@@ -147,6 +157,10 @@ public class CollectionWizardServlet extends DSpaceServlet
             Collection newCollection = c.createCollection();
             request.setAttribute("collection", newCollection);
 
+            Code add by sanjeev kumar on 04-may-2016
+           
+            
+	       
             if (AuthorizeManager.isAdmin(context))
             {
                 // set a variable to show all buttons
@@ -191,9 +205,103 @@ public class CollectionWizardServlet extends DSpaceServlet
             
             JSPManager.showJSP(request, response,
                     "/dspace-admin/wizard-questions.jsp");
+            JSPManager.showJSP(request, response,
+                    "/dspace-admin/wizard-basicinfo.jsp");
             context.complete();
+        }*/
+      String action=request.getParameter("action");
+      Community c=null;
+      if(action!=null && action.equals("subfolder"))
+      {
+    	  int communityID = UIUtil.getIntParameter(request, "community_id");
+     	   EPerson eperson[]=EPerson.findAll(context,EPerson.ID);
+            Group groups[]=Group.findAll(context,Group.ID);
+            request.setAttribute("eperson",eperson);
+            request.setAttribute("groups",groups);
+            request.setAttribute("communityID",communityID);
+         JSPManager.showJSP(request, response,"/dspace-admin/wizard-basicinfo.jsp");
+         context.complete();
+      }
+        String button = UIUtil.getSubmitButton(request, "submit");
+        int community_id=UIUtil.getIntParameter(request, "community_id1");
+       
+        Collection newCollection = null; 
+        if(button.equals("submit_subfolder"))
+        {
+        	if(community_id > -1)
+        	{
+        		
+        		 c = Community.find(context, community_id);
+        		
+                 if (c == null)
+                 {
+                     log.warn(LogManager.getHeader(context, "integrity_error",
+                             UIUtil.getRequestLogInfo(request)));
+                     JSPManager.showIntegrityError(request, response);
+
+                     return;
+                 }
+                 
+               newCollection = c.createCollection();
+                newCollection.setMetadata("name",request.getParameter("name"));
+                newCollection.update();
+                int group=Integer.parseInt(request.getParameter("group"));
+      		  String actionname[]=request.getParameterValues("action_id");
+      		  int userid=Integer.parseInt(request.getParameter("username"));
+      		  EPerson eperson1 = null;
+      		  Group groups1 = null;
+      		if(userid!=0)
+			{
+      			eperson1=EPerson.find(context,userid);
+			}
+			
+			if(group!=0)
+			{
+				 groups1=Group.find(context,group);
+			}
+			/*if(userid!=0&&group!=0&&actionname.length!=0)
+			{
+				for(int i=0;i<actionname.length;i++)
+	    		  {
+	    			  ResourcePolicy myPolicy = ResourcePolicy.create(context);
+	    			  myPolicy.setResource(newCollection);
+	    			  myPolicy.setAction(Integer.parseInt(actionname[i]));
+	    		      myPolicy.setGroup(groups1);
+
+	    		      myPolicy.setEPerson(eperson1);
+	    		      myPolicy.update(); 
+	    		      
+	    		  }
+			}*/
+    		  if(actionname!=null && actionname.length>0)
+    		  {
+    		  for(int i=0;i<actionname.length;i++)
+    		  {
+    			  ResourcePolicy myPolicy = ResourcePolicy.create(context);
+    			  myPolicy.setResource(newCollection);
+    			  myPolicy.setAction(Integer.parseInt(actionname[i]));
+    		      myPolicy.setGroup(groups1);
+
+    		      myPolicy.setEPerson(eperson1);
+    		      myPolicy.update(); 
+    		      
+    		  }
+    		  
+    		  } 
+        	}
+        	context.complete();
+
+        		response.sendRedirect(response.encodeRedirectURL(request.getContextPath()+ "/handle/" + newCollection.getHandle()));
+
         }
-        else
+        else if(button.equals("submit_cancel"))
+        {
+          int communityid=UIUtil.getIntParameter(request, "community_id1");
+  		   c = Community.find(context, communityid);
+          response.sendRedirect(response.encodeRedirectURL(request.getContextPath()+ "/handle/" + c.getHandle()));
+        }
+      
+        /*else
         {
             // Collection already created, dealing with one of the wizard pages
             int collectionID = UIUtil.getIntParameter(request, "collection_id");
@@ -205,6 +313,12 @@ public class CollectionWizardServlet extends DSpaceServlet
             // Put it in request attributes, as most JSPs will need it
             request.setAttribute("collection", collection);
 
+            Code add by sanjeev kumar on 04-may-2016
+            EPerson eperson[]=EPerson.findAll(context,EPerson.ID);
+            Group groups[]=Group.findAll(context,Group.ID);
+            request.setAttribute("eperson",eperson);
+            request.setAttribute("groups",groups);
+           
             if (collection == null)
             {
                 log.warn(LogManager.getHeader(context, "integrity_error",
@@ -240,7 +354,7 @@ public class CollectionWizardServlet extends DSpaceServlet
                         UIUtil.getRequestLogInfo(request)));
                 JSPManager.showIntegrityError(request, response);
             }
-        }
+        }*/
     }
 
     /**
@@ -306,6 +420,8 @@ public class CollectionWizardServlet extends DSpaceServlet
         collection.setMetadata("name", "");
         collection.update();
 
+     
+	  
         // Now display "basic info" screen
         JSPManager.showJSP(request, response,
                 "/dspace-admin/wizard-basicinfo.jsp");
@@ -469,7 +585,48 @@ public class CollectionWizardServlet extends DSpaceServlet
 
                 return;
             }
-
+/*Code add By Sanjeev kumar*/
+            
+            String group=wrapper.getParameter("group");
+    		  String actionname[]=wrapper.getParameterValues("action_id");
+    		  String userid=wrapper.getParameter("username");
+    		  log.info("action name in processbasicInfo========================="+actionname.length);
+    		  log.info("Group id in processbasicInfo========================="+group);
+    		  log.info("User id in processbasicInfo========================="+userid);
+    		  EPerson eperson1;
+    		  Group groups1;
+    		if(userid==null)
+  		  {
+  			eperson1=null;  
+  		  }else{
+  			  eperson1=EPerson.find(context,Integer.parseInt(userid));
+  		  }
+  		  if(group==null)
+  		  {
+  			  groups1=null;
+  		  }
+  		  else
+  		  {
+  			  groups1=Group.find(context,Integer.parseInt(group));
+  		  }
+  		 log.info("action name in CollectionWizardServlet========================="+actionname.length);
+		  log.info("Group id in CollectionWizardServlet========================="+groups1.getName());
+		  log.info("User id in CollectionWizardServlet========================="+eperson1.getFullName());
+  		  
+  		  if(actionname!=null && actionname.length>0)
+  		  {
+  		  for(int i=0;i<actionname.length;i++)
+  		  {
+  			  ResourcePolicy myPolicy = ResourcePolicy.create(context);
+  			  myPolicy.setResource(collection);
+  			  myPolicy.setAction(Integer.parseInt(actionname[i]));
+  		      myPolicy.setGroup(groups1);
+  		      myPolicy.setEPerson(eperson1);
+  		      myPolicy.update(); 
+  		      
+  		  }
+  		  
+  		  } 
             // Get metadata
             collection.setMetadata("name", wrapper.getParameter("name"));
             collection.setMetadata("short_description", wrapper.getParameter("short_description"));
@@ -485,8 +642,12 @@ public class CollectionWizardServlet extends DSpaceServlet
             {
                 collection.setLicense(license);
             }
-
-            File temp = wrapper.getFile("file");
+            /*
+             * 
+             * modify +++ by sanjeev kumar
+             * 
+             * */
+           /* File temp = wrapper.getFile("file");
 
             if (temp != null)
             {
@@ -523,7 +684,12 @@ public class CollectionWizardServlet extends DSpaceServlet
                     log.trace("Unable to delete temporary file");
                 }
             }
-
+*/
+            /*
+             * 
+             * modify end by sanjeev kumar
+             * 
+             * */
             collection.update();
 
             // Now work out what next page is

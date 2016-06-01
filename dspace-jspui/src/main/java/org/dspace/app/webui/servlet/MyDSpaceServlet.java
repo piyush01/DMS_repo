@@ -23,14 +23,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
-import org.dspace.app.webui.util.JSPManager;
 import org.dspace.app.itemexport.ItemExport;
 import org.dspace.app.itemexport.ItemExportException;
 import org.dspace.app.itemimport.BTEBatchImportService;
 import org.dspace.app.itemimport.BatchUpload;
 import org.dspace.app.itemimport.ItemImport;
-import org.dspace.app.util.SubmissionConfigReader;
 import org.dspace.app.util.SubmissionConfig;
+import org.dspace.app.util.SubmissionConfigReader;
+import org.dspace.app.webui.util.JSPManager;
 import org.dspace.app.webui.util.UIUtil;
 import org.dspace.authorize.AuthorizeException;
 import org.dspace.content.Collection;
@@ -49,6 +49,10 @@ import org.dspace.submit.AbstractProcessingStep;
 import org.dspace.utils.DSpace;
 import org.dspace.workflow.WorkflowItem;
 import org.dspace.workflow.WorkflowManager;
+import org.dspace.workflowmanager.WorkflowMasterBean;
+import org.dspace.workflowmanager.WorkflowStepBean;
+import org.dspace.workflowmanager.WorkflowStepManager;
+import org.dspace.workflowprocess.WorkflowProcessManager;
 
 /**
  * Servlet for constructing the components of the "My DSpace" page
@@ -85,13 +89,35 @@ public class MyDSpaceServlet extends DSpaceServlet
 
     public static final int REQUEST_BATCH_IMPORT_ACTION = 7;
     
+    private WorkflowProcessManager workflowProcessManager=new WorkflowProcessManager();
+    private WorkflowStepManager workflowStepManager=new WorkflowStepManager();
     
-    protected void doDSGet(Context context, HttpServletRequest request,
+    
+    public WorkflowStepManager getWorkflowStepManager() {
+		return workflowStepManager;
+	}
+
+	public void setWorkflowStepManager(WorkflowStepManager workflowStepManager) {
+		this.workflowStepManager = workflowStepManager;
+	}
+
+	public WorkflowProcessManager getWorkflowProcessManager() {
+		return workflowProcessManager;
+	}
+
+	public void setWorkflowProcessManager(
+			WorkflowProcessManager workflowProcessManager) {
+		this.workflowProcessManager = workflowProcessManager;
+	}
+
+	protected void doDSGet(Context context, HttpServletRequest request,
             HttpServletResponse response) throws ServletException, IOException,
             SQLException, AuthorizeException
     {
         // GET displays the main page - everthing else is a POST
-        showMainPage(context, request, response);
+     int totId=workflowProcessManager.getSupervisorDetails(context);
+	   request.setAttribute("totId", totId);
+       showMainPage(context, request, response);
      }
     
     protected void doDSPost(Context context, HttpServletRequest request,
@@ -269,21 +295,63 @@ public class MyDSpaceServlet extends DSpaceServlet
                 log.info(LogManager.getHeader(context, "unclaim_workflow",
                         "workflow_id=" + workflowItem.getID()));
 
-                WorkflowManager.unclaim(context, workflowItem, context
-                        .getCurrentUser());
+                WorkflowManager.unclaim(context, workflowItem, context.getCurrentUser());
 
                 showMainPage(context, request, response);
                 context.complete();
                 ok = true;
             }
         }
-
+        
+        else if (buttonPressed.equals("submit_task"))
+        {
+         EPerson e=context.getCurrentUser();
+         request.setAttribute("user_id", e.getID()); 
+         request.setAttribute("tasklist", workflowProcessManager.getTaskList(context));
+         JSPManager.showJSP(request, response, "/mydspace/mytask.jsp");
+         context.complete(); 
+        }
+        else if (buttonPressed.equals("submit_supervisor_task"))
+        {
+         EPerson e=context.getCurrentUser();
+         request.setAttribute("user_id", e.getID());
+         request.setAttribute("supervisortasklist", workflowProcessManager.getSupervisorTaskList(context));
+         JSPManager.showJSP(request, response, "/mydspace/supervisortask.jsp");
+        // context.complete(); 
+        }
+        else if (buttonPressed.equals("submit_view_submission"))
+        {
+         List<WorkflowStepBean> stepList=new ArrayList<>();
+         EPerson e=context.getCurrentUser();
+         request.setAttribute("user_id", e.getID());
+        // WorkflowMasterBean workflowMasterBean=workflowProcessManager.getSubmissionDocument(context);
+         //request.setAttribute("workflowMasterBean", workflowMasterBean);
+        // stepList=workflowStepManager.getAllWorkflowstep(context, workflowMasterBean.getWorkflow_id());
+        // request.setAttribute("stepList", stepList);
+        // System.out.println("workflow id:---------------------->>"+workflowMasterBean.getWorkflow_id()+"--steplist size-----"+stepList.size());
+         JSPManager.showJSP(request, response, "/mydspace/my-submission-doc.jsp");
+        // context.complete(); 
+        }
+        else if (buttonPressed.equals("submit_view_doc"))
+        {
+         List<WorkflowStepBean> stepList=new ArrayList<>();
+         EPerson e=context.getCurrentUser();
+         request.setAttribute("user_id", e.getID());      
+         JSPManager.showJSP(request, response, "/mydspace/workflow-document.jsp");
+        // context.complete(); 
+        }
+        else if (buttonPressed.equals("submit_adhoc_task"))
+        {
+        	JSPManager.showJSP(request, response, "/mydspace/my-adhock-task.jsp");
+        }
+        
         if (!ok)
         {
             log.warn(LogManager.getHeader(context, "integrity_error", UIUtil
                     .getRequestLogInfo(request)));
             JSPManager.showIntegrityError(request, response);
         }
+        
     }
 
     /**
@@ -698,6 +766,8 @@ public class MyDSpaceServlet extends DSpaceServlet
             SQLException, AuthorizeException
     {
     	String buttonPressed = UIUtil.getSubmitButton(request, "submit_mapfile");
+    	
+    	log.info("buttonPressed:---------"+buttonPressed);
 
     	String uploadId = request.getParameter("uploadid");
     	
@@ -738,7 +808,8 @@ public class MyDSpaceServlet extends DSpaceServlet
     		in.close();
     		outStream.close();
     	}
-    	else if (buttonPressed.equals("submit_delete")){
+    	else if (buttonPressed.equals("submit_delete"))
+    	{
     		ItemImport itemImport = new ItemImport();
     		try {
 				itemImport.deleteBatchUpload(context, uploadId);
@@ -833,8 +904,6 @@ public class MyDSpaceServlet extends DSpaceServlet
         catch (Exception e) {
 			// nothing to do they just have no export archives available for download
 		}
-        
-        
         // Set attributes
         request.setAttribute("mydspace.user", currentUser);
         request.setAttribute("workspace.items", workspaceItems);

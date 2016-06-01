@@ -388,6 +388,25 @@ public class Bundle extends DSpaceObject
 
         return b;
     }
+	
+	 /**
+     * Create a new bitstream in this bundle.
+     *  no authorisation
+     * @param is
+     *            the stream to read the new bitstream from
+     * 
+     * @return the newly created bitstream
+     */
+    public Bitstream createBitstreamUnauthorise(InputStream is) throws AuthorizeException,
+            IOException, SQLException
+    {
+        Bitstream b = Bitstream.create(ourContext, is);
+
+        // FIXME: Set permissions for bitstream
+        addBitstreamUnauthorize(b);
+
+        return b;
+    }
 
     /**
      * Create a new bitstream in this bundle. This method is for registering
@@ -425,6 +444,58 @@ public class Bundle extends DSpaceObject
         // Check authorisation
         AuthorizeManager.authorizeAction(ourContext, this, Constants.ADD);
 
+        log.info(LogManager.getHeader(ourContext, "add_bitstream", "bundle_id="
+                + getID() + ",bitstream_id=" + b.getID()));
+
+        // First check that the bitstream isn't already in the list
+        for (int i = 0; i < bitstreams.size(); i++)
+        {
+            Bitstream existing = (Bitstream) bitstreams.get(i);
+
+            if (b.getID() == existing.getID())
+            {
+                // Bitstream is already there; no change
+                return;
+            }
+        }
+
+        // Add the bitstream object
+        bitstreams.add(b);
+
+        ourContext.addEvent(new Event(Event.ADD, Constants.BUNDLE, getID(), 
+                Constants.BITSTREAM, b.getID(), String.valueOf(b.getSequenceID()),
+                getIdentifiers(ourContext)));
+
+        // copy authorization policies from bundle to bitstream
+        // FIXME: multiple inclusion is affected by this...
+        AuthorizeManager.inheritPolicies(ourContext, this, b);
+
+        //Determine the current highest bitstream order in our bundle2bitstream table 
+        //This will always append a newly added bitstream as the last one 
+        int bitstreamOrder = 0;  //bitstream order starts at '0' index
+        TableRow tableRow = DatabaseManager.querySingle(ourContext, "SELECT MAX(bitstream_order) as max_value FROM bundle2bitstream WHERE bundle_id=?", getID());
+        if(tableRow != null){
+            bitstreamOrder = tableRow.getIntColumn("max_value") + 1;
+        }
+
+        // Add the mapping row to the database
+        TableRow mappingRow = DatabaseManager.row("bundle2bitstream");
+        mappingRow.setColumn("bundle_id", getID());
+        mappingRow.setColumn("bitstream_id", b.getID());
+        mappingRow.setColumn("bitstream_order", bitstreamOrder);
+        DatabaseManager.insert(ourContext, mappingRow);
+    }
+	
+	 /**
+     * Add an existing bitstream to this bundle
+     * // no authorisation
+     * @param b
+     *            the bitstream to add
+     */
+    public void addBitstreamUnauthorize(Bitstream b) throws SQLException,
+            AuthorizeException
+    {
+        
         log.info(LogManager.getHeader(ourContext, "add_bitstream", "bundle_id="
                 + getID() + ",bitstream_id=" + b.getID()));
 

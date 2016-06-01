@@ -11,7 +11,9 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.net.URLEncoder;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
@@ -22,6 +24,7 @@ import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.dspace.app.util.GoogleMetadata;
+import org.dspace.app.webui.components.TopCommunitiesSiteProcessor;
 import org.dspace.app.webui.util.Authenticate;
 import org.dspace.app.webui.util.JSPManager;
 import org.dspace.app.webui.util.UIUtil;
@@ -45,6 +48,7 @@ import org.dspace.handle.HandleManager;
 import org.dspace.plugin.CollectionHomeProcessor;
 import org.dspace.plugin.CommunityHomeProcessor;
 import org.dspace.plugin.ItemHomeProcessor;
+import org.dspace.plugin.PluginException;
 import org.dspace.usage.UsageEvent;
 import org.dspace.utils.DSpace;
 import org.jdom.Element;
@@ -70,10 +74,15 @@ public class HandleServlet extends DSpaceServlet
 {
     /** log4j category */
     private static Logger log = Logger.getLogger(HandleServlet.class);
-
     /** For obtaining &lt;meta&gt; elements to put in the &lt;head&gt; */
     private DisseminationCrosswalk xHTMLHeadCrosswalk;
 
+    // This will map community IDs to arrays of collections
+    private Map<Integer, Collection[]> colMap;
+
+    // This will map communityIDs to arrays of sub-communities
+    private Map<Integer, Community[]> commMap;
+    private static final Object staticLock = new Object();
     public HandleServlet()
     {
         super();
@@ -89,8 +98,11 @@ public class HandleServlet extends DSpaceServlet
         String extraPathInfo = null;
         DSpaceObject dso = null;
 
+        //For tree structure 
+       process(context, request, response);
         // Original path info, of the form "1721.x/1234"
         // or "1721.x/1234/extra/stuff"
+       
         String path = request.getPathInfo();
 
         if (path != null)
@@ -123,11 +135,12 @@ public class HandleServlet extends DSpaceServlet
         }
 
         // Find out what the handle relates to
+        log.info("handle manger:--------------------------------"+handle);
         if (handle != null)
         {
             dso = HandleManager.resolveToObject(context, handle);
-        }
-
+        } 
+         log.info("dso type:--------------------------------"+dso.getType());
         if (dso == null)
         {
             log.info(LogManager.getHeader(context, "invalid_id", "path=" + path));
@@ -197,6 +210,7 @@ public class HandleServlet extends DSpaceServlet
         // OK, we have a valid Handle. What is it?
         if (dso.getType() == Constants.ITEM)
         {
+        	log.info("item type list:----------------------------->>>>>>>>>>>"+dso.getType());
          // do we actually want to display the item, or forward to another page?
             if ((extraPathInfo == null) || (extraPathInfo.equals("/")))
             {
@@ -241,6 +255,7 @@ public class HandleServlet extends DSpaceServlet
             }
 
         }
+        
         else if (dso.getType() == Constants.COLLECTION)
         {
             Collection c = (Collection) dso;
@@ -331,6 +346,7 @@ public class HandleServlet extends DSpaceServlet
             throws ServletException, IOException, SQLException,
             AuthorizeException
     {
+    	log.info("displayItem:---------------------");
         // perform any necessary pre-processing
         preProcessItemHome(context, request, response, item);
         
@@ -343,16 +359,12 @@ public class HandleServlet extends DSpaceServlet
         }
 
         // Ensure the user has authorisation
-        AuthorizeManager.authorizeAction(context, item, Constants.READ);
-
-        log
-                .info(LogManager.getHeader(context, "view_item", "handle="
-                        + handle));
+        AuthorizeManager.authorizeAction(context, item, Constants.READ);      
+        log.info(LogManager.getHeader(context, "view_item", "handle="+ handle));
 
         // show edit link
         if (item.canEdit())
-        {
-            // set a variable to create an edit button
+        { // set a variable to create an edit button
             request.setAttribute("admin_button", Boolean.TRUE);
         }
 
@@ -382,13 +394,11 @@ public class HandleServlet extends DSpaceServlet
         }
 
         String headMetadata = "";
-
         // Produce <meta> elements for header from crosswalk
         try
         {
             List<Element> l = xHTMLHeadCrosswalk.disseminateList(item);
             StringWriter sw = new StringWriter();
-
             XMLOutputter xmlo = new XMLOutputter();
             xmlo.output(new Text("\n"), sw);
             for (Element e : l)
@@ -467,6 +477,7 @@ public class HandleServlet extends DSpaceServlet
         try
         {
             ItemHomeProcessor[] chp = (ItemHomeProcessor[]) PluginManager.getPluginSequence(ItemHomeProcessor.class);
+          
             for (int i = 0; i < chp.length; i++)
             {
                 chp[i].process(context, request, response, item);
@@ -546,6 +557,8 @@ public class HandleServlet extends DSpaceServlet
             request.setAttribute("community", community);
             request.setAttribute("collections", collections);
             request.setAttribute("subcommunities", subcommunities);
+            Community topcommunity[]=Community.findAllTop(context);
+            request.setAttribute("topcommunity", topcommunity);
             JSPManager.showJSP(request, response, "/community-home.jsp");
         }
     }
@@ -808,5 +821,63 @@ public class HandleServlet extends DSpaceServlet
         }
 
         return reversedParents;
+    }
+    
+    public void process(Context context, HttpServletRequest request,
+            HttpServletResponse response) throws AuthorizeException
+    {
+    	log.info("i ma here call handle servlet");
+        // Get the top communities to shows in the community list
+        Community[] communities;
+        try
+        {
+           // communities = Community.findAllTop(context);
+            synchronized (staticLock) 
+            {
+             colMap = new HashMap<Integer, Collection[]>();
+             commMap = new HashMap<Integer, Community[]>();
+             log.info(LogManager.getHeader(context, "view_community_list", ""));
+
+            communities = Community.findAllTop(context);
+             for (int com = 0; com < communities.length; com++) 
+             {
+                 build(communities[com]);
+             }
+             request.setAttribute("communities", communities);
+             request.setAttribute("collections.map", colMap);
+             request.setAttribute("subcommunities.map", commMap);
+            // JSPManager.showJSP(request, response, "/community-list.jsp");
+            }
+        }
+        catch (SQLException e)
+        {
+            log.info("Error in tree structure:-----------------"+e);
+        }
+    }
+    
+    /*
+     * Get all subcommunities and collections from a community
+     */
+    private void build(Community c) throws SQLException {
+
+        Integer comID = Integer.valueOf(c.getID());
+
+        // Find collections in community
+        Collection[] colls = c.getCollections();
+        colMap.put(comID, colls);
+
+        // Find subcommunties in community
+        Community[] comms = c.getSubcommunities();
+        
+        // Get all subcommunities for each communities if they have some
+        if (comms.length > 0) 
+        {
+            commMap.put(comID, comms);
+            
+            for (int sub = 0; sub < comms.length; sub++) {
+                
+                build(comms[sub]);
+            }
+        }
     }
 }

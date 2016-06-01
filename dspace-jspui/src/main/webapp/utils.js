@@ -265,5 +265,42 @@ function isBrowser(b,v) {
 		  return browserOk && versionOk;
 }
 
+function showHideToggle(divID) {	
+	   if (document.getElementById && !document.all) {
+	       previewBox = document.getElementById(divID);
+	       var state = previewBox.style.display;
+	       if (state == 'block') {state = 'none';} else {state = 'block';}
+	       previewBox.style.display = state;
+	   }
+	}
+	
+	function urlencode(str) {
+	   return escape(str).replace(/\+/g,'%2B').replace(/%20/g, '+').replace(/\*/g, '%2A').replace(/\//g, '%2F').replace(/@/g, '%40');
+	}
+	
+	String.prototype.endsWith = function(str)
+	{
+	    return (this.match(str+"$")==str)
+	}
+	
+	function setPreviewSource(source) {
+		var url="http://localhost:8080/jspui/";
+		source=url+source;
+	
+	    if(false) {			
+	        // if you need to change bitstream link to use a web viewable server (used in development)
+	        source = "https://kb.osu.edu/dspace" + source;
+	    }
+	
+	    if(source.endsWith(".pdf") || source.endsWith(".doc")) {		
+	      source = urlencode(source);		
+	     source = "http://docs.google.com/viewer?url="+source+"&embedded=true";
+	   
+		}		
+	    $("#embed").attr("src", source); //requires jQuery	   
+	//	showHideToggle('preview');
+	    // and toggle
+	}
+
 
 

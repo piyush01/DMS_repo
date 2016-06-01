@@ -25,6 +25,7 @@ import org.dspace.storage.rdbms.DatabaseManager;
 import org.dspace.storage.rdbms.TableRow;
 import org.dspace.storage.rdbms.TableRowIterator;
 import org.dspace.workflow.WorkflowItem;
+import org.dspace.workflowmanager.WorkflowMasterBean;
 import org.dspace.xmlworkflow.storedcomponents.CollectionRole;
 import org.dspace.xmlworkflow.storedcomponents.XmlWorkflowItem;
 
@@ -34,6 +35,7 @@ import java.io.InputStream;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.*;
 
 /**
@@ -194,6 +196,8 @@ public class Collection extends DSpaceObject
 
         return new Collection(context, row);
     }
+    
+    
 
     /**
      * Create a new collection, with a new ID. This method is not public, and
@@ -251,16 +255,17 @@ public class Collection extends DSpaceObject
             //pass exception on up the chain
             throw ie;
         }
-
+        
+        ResourcePolicy myPolicy = ResourcePolicy.create(context);
+        Group anonymousGroup = Group.find(context, 0);
         // create the default authorization policy for collections
         // of 'anonymous' READ
-        Group anonymousGroup = Group.find(context, 0);
-
+       /* Group anonymousGroup = Group.find(context, 0);
         ResourcePolicy myPolicy = ResourcePolicy.create(context);
         myPolicy.setResource(c);
         myPolicy.setAction(Constants.READ);
         myPolicy.setGroup(anonymousGroup);
-        myPolicy.update();
+        myPolicy.update();*/
 
         // now create the default policies for submitted items
         myPolicy = ResourcePolicy.create(context);
@@ -483,7 +488,74 @@ public class Collection extends DSpaceObject
 
         return new ItemIterator(ourContext, rows);
     }
+    
+    /**
+     * Get the in_archive items in this collection. The order is indeterminate.
+     *
+     * @return an iterator over the items in the collection.
+     * @throws SQLException
+     */
+    public static Integer getCollectionByItemId(Context context,Integer item_id) throws SQLException
+    {
+    	Integer collection_id=0;
+    	ResultSet rs = null;
+		Statement statment = null;
+        String myQuery = "SELECT collection_id FROM item, collection2item WHERE "
+                + "item.item_id=collection2item.item_id AND "
+                + "collection2item.item_id= "+item_id+" ";              
+		
+		try {
+			statment = context.getDBConnection().createStatement();
+			rs = statment.executeQuery(myQuery);
+			while (rs.next())
+			{
+				collection_id=rs.getInt("collection_id");
+			}
+		} catch (SQLException ex) {
+			log.info("Error in get collection id:=========>" + ex);
+		} finally {
+			if (rs != null) {
+				try {
+					rs.close();
+				} catch (SQLException sqle) {
+				}
+			}
+			if (statment != null) {
+				try {
+					statment.close();
+				} catch (SQLException sqle) {
+					log.error("SQL doInsertPostgres statement close Error - ",
+							sqle);
+					throw sqle;
+				}
+			}
+		}
 
+		return collection_id;
+    }
+    
+
+    /**
+     * Br Rajesh Kumar
+     * Get the in_archive items in this collection. The order is indeterminate.
+     *
+     * @return an iterator over the items in the collection.
+     * @throws SQLException
+     */
+    public ItemIterator getItemsById(Integer colId) throws SQLException
+    {
+        String myQuery = "SELECT item.* FROM item, collection2item WHERE "
+                + "item.item_id=collection2item.item_id AND "
+                + "collection2item.collection_id= ? "
+                + "AND item.in_archive='1'";
+
+        TableRowIterator rows = DatabaseManager.queryTable(ourContext, "item",
+                myQuery,colId);
+
+        return new ItemIterator(ourContext, rows);
+    }
+    
+    
     /**
      * Get the in_archive items in this collection. The order is indeterminate.
      * Provides the ability to use limit and offset, for efficient paging.
@@ -726,8 +798,8 @@ public class Collection extends DSpaceObject
             ourContext.turnOffAuthorisationSystem();
             Group g = Group.create(ourContext);
             ourContext.restoreAuthSystemState();
-
-            g.setName("COLLECTION_" + getID() + "_WORKFLOW_STEP_" + step);
+            Collection collection=find(ourContext,getID());
+            g.setName(collection.getMetadata("name") + "_WORKFLOW_STEP_" + step);
             g.update();
             setWorkflowGroup(step, g);
 
@@ -798,8 +870,8 @@ public class Collection extends DSpaceObject
             ourContext.turnOffAuthorisationSystem();
             submitters = Group.create(ourContext);
             ourContext.restoreAuthSystemState();
-
-            submitters.setName("COLLECTION_" + getID() + "_SUBMIT");
+            Collection collection=find(ourContext,getID());
+            submitters.setName(collection.getMetadata("name")+ "_SUBMIT");
             submitters.update();
         }
 
@@ -873,8 +945,8 @@ public class Collection extends DSpaceObject
             ourContext.turnOffAuthorisationSystem();
             admins = Group.create(ourContext);
             ourContext.restoreAuthSystemState();
-
-            admins.setName("COLLECTION_" + getID() + "_ADMIN");
+            Collection collection=find(ourContext,getID());
+            admins.setName(collection.getMetadata("name")+ "_ADMIN");
             admins.update();
         }
 
@@ -1828,6 +1900,7 @@ public class Collection extends DSpaceObject
         while(tri.hasNext()) {
             TableRow row = tri.next();
             Collection collection = Collection.find(context, row.getIntColumn("collection_id"));
+            
             collections.add(collection);
         }
 

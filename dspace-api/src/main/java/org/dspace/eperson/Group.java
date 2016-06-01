@@ -742,8 +742,7 @@ public class Group extends DSpaceObject
             }
         }
     }
-
-    /**
+ /**
      * Finds all groups in the site
      * 
      * @param context

@@ -1,0 +1,149 @@
+.my
+{
+    /* You will get totally diffrent menu alignment and layout by setting following margin, width, and float with different values.
+    For detailed instruction please visit www.menucool.com/horizontal/change-menu-alignment  */
+    margin: 0; width: 100%; float:none;
+    /*following "behavior" works for IE6, IE7, and IE8. Other browsers will ignore it.*/
+    height: 40px;
+    position:relative;/*! for IE htc*/
+    z-index:4;/*H2*/
+    list-style: none;
+    padding: 0;
+}
+.my li
+{
+    padding: 0;
+    /*margin: 0;
+    display: block; TODO: I am testing them if they can be removed. If can, remove them.*/
+    float: left;
+    height: 36px;
+    position: relative;/*move it into .my if you want submenu to be positioned relative to the whole menu instead of this li element*/
+}
+.my li:hover, .my li.onhover
+{
+    background: #1995DC;
+}
+
+ul.my a
+{
+    padding: 0 15px;
+    line-height: 48px; /*Note: keep this value the same as the height of .my and .my li */
+    font-size: 14px;
+    color: white;
+    display: block;
+    outline: 0;
+    text-decoration: none;
+}
+.my a:hover
+{
+	background-color:#608dbd;
+    color: white;
+}
+.my ul a.arrow
+{
+    background: url(/image/right.gif) no-repeat 97% center;
+}
+ 
+        
+/*Used to align a top-level item to the right*/        
+.my .menuRight
+{
+    float: right;
+    margin-right: 0px;
+}
+        
+/*for the top-level separators*/
+.my li.separator
+{
+    font-size:0;
+    overflow:hidden;
+    border-left:1px solid #F7F7F7;
+    border-right:1px solid #BBBBBB;
+}
+               
+        
+/*######sub level###########*/
+        
+ul.my ul
+{
+    width:200px;
+    position: absolute;
+    left: -9999px;
+    border: 1px solid #DDD;
+    border-top: 0; 
+    background: #FFF;    
+    text-align: left;
+    list-style: none; margin: 0;  
+    /*Following 1px(padding-right) will determine how much it is overlapped by the sub-sub-menu */
+    padding: 0 1px 10px 0;
+    box-sizing:content-box;
+}
+
+.my li li
+{
+    float: none;
+    white-space:nowrap;
+    height: 26px;
+}
+.my li li:hover, .my li li.onhover
+{
+    background:#f7f7f7;
+}
+.my ul a
+{
+    padding: 0 20px;
+    line-height: 26px;
+    font-size: 0.9em;
+    font-weight: normal;
+    color: #000000;
+    text-align: left;
+}
+
+.my ul a:hover
+{
+    color: black;
+}
+
+.my li:hover ul, .my li.onhover ul
+{
+    left: -1px;/*Use this property to change offset of the dropdown*/
+    top: auto;
+}
+
+.my li:hover .dropToLeft, .my li.onhover .dropToLeft
+{
+    left: auto;
+    right: -1px;
+    top: auto;
+}
+.my ul ul
+{
+    border-top: 1px solid #DDD;
+}
+
+.my li:hover ul ul, .my li:hover ul ul ul, .my li:hover ul ul ul ul,
+.my li.onhover ul ul, .my li.onhover ul ul ul, .my li.onhover ul ul ul ul
+{
+    left: -9999px;
+    top:0;
+}
+
+.my li li:hover ul, .my li li li:hover ul, .my li li li li:hover ul,
+.my li li.onhover ul, .my li li li.onhover ul, .my li li li li.onhover ul
+{
+    left: 200px;
+}
+        
+/*####### special effects ##########*/
+ .right-arrow{
+	display:inline-block;
+	width:0;
+	height:0;
+	margin-left:5px;
+	vertical-align:middle;
+	border-top:4px solid transparent;
+
+	border-bottom:4px solid transparent;
+	border-left:4px solid #000000;
+	content:""
+	}       

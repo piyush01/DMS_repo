@@ -219,14 +219,18 @@ public class DatabaseManager
                {
                        sb.append(",");
                }
+               
                 sb.append(parameters[i].toString());
             }
             log.debug(sb.toString());
+            log.info("Parameter where=-------------------------------->>"+sb.toString());
+            
         }
 
         PreparedStatement statement = null;
         try
         {
+        	log.info("Query======queryTable method=============>>"+query);
             statement = context.getDBConnection().prepareStatement(query);
 
             loadParameters(statement, parameters);
@@ -286,7 +290,7 @@ public class DatabaseManager
             }
             log.debug("Running query \"" + query + "\"  with parameters: " + sb.toString());
         }
-
+       log.info("Query===========================-----query( merthod-------------====================>>>"+query);
         PreparedStatement statement = context.getDBConnection().prepareStatement(query);
         try
         {
@@ -1336,8 +1340,8 @@ public class DatabaseManager
             Connection connection = dataSource.getConnection();
             DatabaseMetaData meta = connection.getMetaData();
             dbms = meta.getDatabaseProductName();
-            log.info("DBMS is '{}'", dbms);
-            log.info("DBMS driver version is '{}'", meta.getDatabaseProductVersion());
+            //log.info("DBMS is '{}'", dbms);
+           // log.info("DBMS driver version is '{}'", meta.getDatabaseProductVersion());
             
             // Based on our DBMS type, determine how to categorize it
             dbms_keyword = findDbKeyword(meta);
@@ -1534,38 +1538,47 @@ public class DatabaseManager
 	    {
 	    	if (parameter instanceof String)
 	    	{
+	    		log.info("Parameter loading---String---->>"+parameters.toString()+"--->>"+(String) parameter);
 	    		statement.setString(idx,(String) parameter);
 	    	}
             else if (parameter instanceof Long)
             {
+            	log.info("Parameter loading----Long--->>"+parameters.toString()+"--->>"+((Long) parameter).longValue());
                 statement.setLong(idx,((Long) parameter).longValue());
             }
 	    	else if (parameter instanceof Integer)
 	    	{
+	    		log.info("Parameter loading---Integer---->>"+parameters.toString()+"--->>"+((Integer) parameter).intValue());
 	    		statement.setInt(idx,((Integer) parameter).intValue());
 	    	}
             else if (parameter instanceof Short)
             {
+            	log.info("Parameter loading---Short---->>"+parameters.toString()+"--->>"+((Short) parameter).shortValue());
                 statement.setShort(idx,((Short) parameter).shortValue());
             }
             else if (parameter instanceof Date)
             {
+            	log.info("Parameter loading----Date--->>"+parameters.toString()+"--->>"+(Date) parameter);
                 statement.setDate(idx,(Date) parameter);
             }
             else if (parameter instanceof Time)
             {
+                log.info("Parameter loading--Time----->>"+parameters.toString()+"--->>"+(Time) parameter);
                 statement.setTime(idx,(Time) parameter);
             }
             else if (parameter instanceof Timestamp)
             {
+            	log.info("Parameter loading--Timestamp----->>"+parameters.toString()+"--->>"+(Timestamp) parameter);
                 statement.setTimestamp(idx,(Timestamp) parameter);
             }
 	    	else if (parameter instanceof Double)
 	    	{
+	    		log.info("Parameter loading--Double----->>"+parameters.toString()+"--->>"+(Double) parameter);
 	    		statement.setDouble(idx,((Double) parameter).doubleValue());
 	    	}
 	    	else if (parameter instanceof Float)
 	    	{
+	    		log.info("Parameter loading--Float----->>"+parameters.toString()+"--->>"+(Float) parameter);
 	    		statement.setFloat(idx,((Float) parameter).floatValue());
 	    	}
             else if (parameter == null)
@@ -1710,6 +1723,7 @@ public class DatabaseManager
             }
 
             sql = insertBuilder.append(valuesBuilder.toString()).append(") RETURNING ").append(getPrimaryKeyColumn(table)).toString();
+          
             insertSQL.put(table, sql);
         }
         else
@@ -1738,6 +1752,7 @@ public class DatabaseManager
         ResultSet rs = null;
         try
         {
+        	log.info("Sql Query======----doInsertPostgres-------------====>"+sql);
             statement = context.getDBConnection().prepareStatement(sql);
         	loadParameters(statement, params, row);
             rs = statement.executeQuery();

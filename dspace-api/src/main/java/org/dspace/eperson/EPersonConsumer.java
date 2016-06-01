@@ -61,7 +61,10 @@ public class EPersonConsumer implements Consumer
                 if (et == Event.CREATE)
                 {
                     // Notify of new user registration
-                    String notifyRecipient = ConfigurationManager.getProperty("registration.notify");
+                	EPerson eperson = EPerson.find(context, id);
+                    //String notifyRecipient = ConfigurationManager.getProperty("registration.notify");
+                	String notifyRecipient =eperson.getSuperiorEmail();
+                	log.info("Superior MAil ID =======>"+notifyRecipient);
                     if (notifyRecipient == null) {
                         notifyRecipient = "";
                     }
@@ -71,14 +74,15 @@ public class EPersonConsumer implements Consumer
                     {
                         try
                         {
-                            EPerson eperson = EPerson.find(context, id);
+                            
                             Email adminEmail = Email.getEmail(I18nUtil.getEmailFilename(context.getCurrentLocale(), "registration_notify"));
                             adminEmail.addRecipient(notifyRecipient);
-
+                            log.info("Email Id for addRecipient===================>"+eperson.getEmail());
                             adminEmail.addArgument(ConfigurationManager.getProperty("dspace.name"));
                             adminEmail.addArgument(ConfigurationManager.getProperty("dspace.url"));
                             adminEmail.addArgument(eperson.getFirstName() + " " + eperson.getLastName()); // Name
                             adminEmail.addArgument(eperson.getEmail());
+                            log.info("    adminEmail.addArgument(eperson.getEmail());===============>"+eperson.getEmail());
                             adminEmail.addArgument(new Date());
 
                             adminEmail.setReplyTo(eperson.getEmail());

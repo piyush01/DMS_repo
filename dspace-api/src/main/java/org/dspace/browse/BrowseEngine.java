@@ -161,8 +161,8 @@ public class BrowseEngine
         dao.setOrderField(orderBy);
 
         // now run the query
+       
         List<BrowseItem> results = dao.doQuery();
-
         // construct the mostly empty BrowseInfo object to pass back
         BrowseInfo browseInfo = new BrowseInfo(results, 0, scope.getResultsPerPage(), 0);
 

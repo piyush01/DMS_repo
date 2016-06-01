@@ -320,8 +320,8 @@ public class HandleManager
             throws IllegalStateException, SQLException
     {
         TableRow dbhandle = findHandleInternal(context, handle);
-
-        if (dbhandle == null)
+       
+       if (dbhandle == null)
         {
             //If this is the Site-wide Handle, return Site object
             if (handle.equals(Site.getSiteHandle()))

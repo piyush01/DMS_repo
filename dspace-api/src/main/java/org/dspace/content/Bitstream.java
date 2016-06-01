@@ -9,9 +9,15 @@ package org.dspace.content;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.log4j.Logger;
 import org.dspace.authorize.AuthorizeException;
@@ -20,11 +26,14 @@ import org.dspace.core.ConfigurationManager;
 import org.dspace.core.Constants;
 import org.dspace.core.Context;
 import org.dspace.core.LogManager;
+import org.dspace.eperson.EPerson;
 import org.dspace.event.Event;
 import org.dspace.storage.bitstore.BitstreamStorageManager;
 import org.dspace.storage.rdbms.DatabaseManager;
 import org.dspace.storage.rdbms.TableRow;
 import org.dspace.storage.rdbms.TableRowIterator;
+import org.dspace.util.SequenceGenerateManager;
+import org.dspace.workflowmanager.WorkflowMasterBean;
 
 /**
  * Class representing bitstreams stored in the DSpace system.
@@ -175,7 +184,7 @@ public class Bitstream extends DSpaceObject
                 tri.close();
             }
         }
-
+        
         Bitstream[] bitstreamArray = new Bitstream[bitstreams.size()];
         bitstreamArray = bitstreams.toArray(bitstreamArray);
 
@@ -504,7 +513,33 @@ public class Bitstream extends DSpaceObject
         }
 
     }
+	
+/**
+     * Update the bitstream metadata. Note that the content of the bitstream
+     * cannot be changed - for that you need to create a new bitstream.
+     * // no authorisation
+     * @throws SQLException
+     * @throws AuthorizeException
+     */
+    public void updateunauthorize() throws SQLException, AuthorizeException
+    {
+      
+        log.info(LogManager.getHeader(ourContext, "update_bitstream",
+                "bitstream_id=" + getID()));
+        DatabaseManager.update(ourContext, bRow);
 
+        if (modified)
+        {
+            ourContext.addEvent(new Event(Event.MODIFY, Constants.BITSTREAM, getID(), null, getIdentifiers(ourContext)));
+            modified = false;
+        }
+        if (modifiedMetadata)
+        {
+            updateMetadata();
+            clearDetails();
+        }
+
+    }
     /**
      * Delete the bitstream, including any mappings to bundles
      * 
@@ -731,4 +766,89 @@ public class Bitstream extends DSpaceObject
         //Also fire a modified event since the bitstream HAS been modified
         ourContext.addEvent(new Event(Event.MODIFY, Constants.BITSTREAM, getID(), null, getIdentifiers(ourContext)));
     }
+    
+    public Integer checkOutBitstream(Context context,String status,Integer bitstream_id)
+            throws IOException, SQLException
+    {
+		int nextId = 0, rowId = 0;
+		PreparedStatement preparedStatement = null;
+		ResultSet rs = null;
+		if (status != null && !status.equals("")) {
+			try {
+				nextId = SequenceGenerateManager.getGeneratedId(context,"bitstream_status_seq");
+				preparedStatement = context.getDBConnection().prepareStatement(" insert into Tb_DMS_Bitstream_status(id, bitstream_id, is_checkout,update_date) values (?, ?, ?, ?)");
+				preparedStatement.setInt(1, nextId);
+				preparedStatement.setInt(2, bitstream_id);				
+				preparedStatement.setString(3,status);				
+				preparedStatement.setDate(4, new java.sql.Date(new Date().getTime()));				
+				rowId = preparedStatement.executeUpdate();
+
+			} catch (Exception e) {
+				log.info("Error in checkOutBitstream:-------------"+ e.getMessage());
+			} finally {
+				if (rs != null) {
+					try {
+						rs.close();
+					} catch (SQLException sqle) {
+					}
+				}
+				if (preparedStatement != null) {
+					try {
+						preparedStatement.close();
+					} catch (SQLException sqle) {
+						log.error(
+								"SQL doInsertPostgres statement close Error - ",
+								sqle);
+						throw sqle;
+					}
+				}
+			}
+		}
+
+		return rowId;
+    }
+    
+    public boolean isCheckOut(Context context,Integer bitstream_id) throws SQLException {
+    	boolean isCheck=Boolean.FALSE;
+		Statement statment = null;
+		ResultSet rs = null;
+		try {
+			statment = context.getDBConnection().createStatement();
+			rs = statment.executeQuery("Select is_checkout from Tb_DMS_Bitstream_status where bitstream_id="+ bitstream_id + " ");
+			while (rs.next())
+			{						
+			 
+			  if(rs.getString("is_checkout").equals("Y"));
+			  {
+				  isCheck=Boolean.TRUE;
+			  }
+			}
+		}
+		catch (Exception e) 
+		{
+			log.info("Error in get workflow by id===========>" + e);
+		} finally {
+			if (rs != null) {
+				try {
+					rs.close();
+				} catch (SQLException sqle) {
+					log.error("SQL doInsertPostgres statement close Error - ",
+							sqle);
+					throw sqle;
+				}
+			}
+			if (statment != null) {
+				try {
+					statment.close();
+				} catch (SQLException sqle) {
+					log.error("SQL doInsertPostgres statement close Error - ",
+							sqle);
+					throw sqle;
+				}
+			}
+		}
+		
+		return isCheck;
+	}
+
 }

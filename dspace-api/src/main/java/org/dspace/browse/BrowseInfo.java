@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.log4j.Logger;
 import org.dspace.content.Collection;
 import org.dspace.content.Community;
 import org.dspace.content.Metadatum;
@@ -29,6 +30,7 @@ import org.dspace.sort.SortOption;
  */
 public class BrowseInfo
 {
+	 private static final Logger log = Logger.getLogger(BrowseInfo.class);
     /**
      * The results of the browse.
      * FIXME: Unable to generify due to mixed usage
@@ -121,7 +123,7 @@ public class BrowseInfo
         {
             throw new IllegalArgumentException("Null result list not allowed");
         }
-
+        log.info(" BrowseInfo Constructure:------------------------------");
         this.results = Collections.unmodifiableList(results);
         this.overallPosition = overallPosition;
         this.total = total;
@@ -517,6 +519,7 @@ public class BrowseInfo
     		Item[] items = new Item[bis.length];
     		for (int i = 0; i < bis.length; i++)
     		{
+    			log.info("browse info::::::::item id:---------------"+bis[i].getID());
     			items[i] = Item.find(context, bis[i].getID());
     		}
     		return items;

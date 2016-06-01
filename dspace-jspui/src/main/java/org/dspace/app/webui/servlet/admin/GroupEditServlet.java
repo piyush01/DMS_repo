@@ -217,8 +217,9 @@ public class GroupEditServlet extends DSpaceServlet
                 request.setAttribute("group", group);
                 request.setAttribute("members", group.getMembers());
                 request.setAttribute("membergroups", group.getMemberGroups());
-
-                JSPManager.showJSP(request, response, "/tools/group-edit.jsp");
+                request.setAttribute("message", "Successfully update your group and user!");
+                //JSPManager.showJSP(request, response, "/tools/group-list.jsp");
+                showMainPage(c, request, response);
                 c.complete();
             }
             else if (submit_group_delete)

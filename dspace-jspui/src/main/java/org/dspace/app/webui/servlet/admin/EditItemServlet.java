@@ -25,8 +25,9 @@ import java.util.StringTokenizer;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.commons.fileupload.FileUploadBase.FileSizeLimitExceededException;
+import javax.servlet.http.HttpSession;
 
+import org.apache.commons.fileupload.FileUploadBase.FileSizeLimitExceededException;
 import org.apache.log4j.Logger;
 import org.dspace.app.util.AuthorizeUtil;
 import org.dspace.app.util.Util;
@@ -109,11 +110,27 @@ public class EditItemServlet extends DSpaceServlet
          */
         int internalID = UIUtil.getIntParameter(request, "item_id");
         String handle = request.getParameter("handle");
-        boolean showError = false;
+        boolean showError = false;        
+        int action = UIUtil.getIntParameter(request, "action");
 
         // See if an item ID or Handle was passed in
         Item itemToEdit = null;
+        if(request.getParameter("submit_delete") != null)
+        {
+        	Item item = Item.find(context, UIUtil.getIntParameter(request,"item_id"));
+            String handle1 = HandleManager.findHandle(context, item);
+            // now check to see if person can edit item
+            checkEditAuthorization(context, item);
 
+            request.setAttribute("item", item);
+            request.setAttribute("handle", handle1);
+            
+          // Show "delete item" confirmation page
+          JSPManager.showJSP(request, response,"/tools/confirm-delete-item.jsp");
+          
+          return;
+        }
+        
         if (internalID > 0)
         {
             itemToEdit = Item.find(context, internalID);
@@ -216,14 +233,32 @@ public class EditItemServlet extends DSpaceServlet
             // FIXME: Don't know if this does all it should - remove Handle?
             Collection[] collections = item.getCollections();
 
+            
             // Remove item from all the collections it's in
             for (int i = 0; i < collections.length; i++)
             {
                 collections[i].removeItem(item);
             }
+            
+            HttpSession session = request.getSession(true);
+            String handleid=(String)session.getAttribute("handleid");
+            session.removeAttribute("handleid");                
+	          if(handleid!=null && !handleid.equals(""))
+	          {
+	           String msg="Document has been successfully deleted!";
+	            response.sendRedirect(request.getContextPath()+"/handle/"+handleid+"?message="+msg);
+	            context.complete();
+	            return;
+	          }
+	          else
+	          {              
+	        	  JSPManager.showJSP(request, response, "/tools/get-item-id.jsp");
+	              context.complete();
+	          }
+	          
 
-            JSPManager.showJSP(request, response, "/tools/get-item-id.jsp");
-            context.complete();
+            /*JSPManager.showJSP(request, response, "/tools/get-item-id.jsp");
+            context.complete();*/
 
             break;
 
@@ -544,7 +579,7 @@ public class EditItemServlet extends DSpaceServlet
 			request.setAttribute("publicize_button", AuthorizeManager
 					.authorizeActionBoolean(context, item, Constants.WRITE));
 		}
-        
+		
         request.setAttribute("item", item);
         request.setAttribute("handle", handle);
         request.setAttribute("collections", collections);
@@ -666,6 +701,8 @@ public class EditItemServlet extends DSpaceServlet
                     item.addMetadata(schema, element, qualifier, language, value,
                             authority, confidence);
                 }
+                
+                request.setAttribute("msg", "Successfully update metadata.");
             }
             else if (p.startsWith("bitstream_name"))
             {
@@ -799,7 +836,8 @@ public class EditItemServlet extends DSpaceServlet
             request.setAttribute("item", item);
             JSPManager
                     .showJSP(request, response, "/tools/upload-bitstream.jsp");
-        }else
+        }
+        else
         if(button.equals("submit_update_order") || button.startsWith("submit_order_"))
         {
             Bundle[] bundles = item.getBundles("ORIGINAL");
@@ -862,6 +900,7 @@ public class EditItemServlet extends DSpaceServlet
      * @param response
      *            current servlet response object
      */
+  
     private void processUploadBitstream(Context context,
             HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException, SQLException,

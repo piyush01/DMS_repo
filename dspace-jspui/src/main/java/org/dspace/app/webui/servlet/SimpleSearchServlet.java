@@ -37,19 +37,21 @@ public class SimpleSearchServlet extends DSpaceServlet
 
     public void init()
     {
+    	
         try
         {
+        	log.info("SimpleSearchServlet1");
             internalLogic = (SearchRequestProcessor) PluginManager
                     .getSinglePlugin(SearchRequestProcessor.class);
         }
         catch (PluginConfigurationError e)
         {
-            log.warn(
-                    "SimpleSearchServlet not properly configurated, please configure the SearchRequestProcessor plugin",
-                    e);
+        	log.info(" catch SimpleSearchServlet1");
+            log.warn("SimpleSearchServlet not properly configurated, please configure the SearchRequestProcessor plugin",e);
         }
         if (internalLogic == null)
         {   // Discovery is the default search provider since DSpace 4.0
+        	log.info(" SimpleSearchServlet 2");
             internalLogic = new DiscoverySearchRequestProcessor();
         }
     }
@@ -60,10 +62,12 @@ public class SimpleSearchServlet extends DSpaceServlet
     {
         try
         {
+        	log.info(" doDSGet SimpleSearchServlet 3");
             internalLogic.doSimpleSearch(context, request, response);
         }
         catch (SearchProcessorException e)
         {
+         log.info(" doDSGet SearchProcessorException  4");
             throw new ServletException(e.getMessage(), e);
         }
     }

@@ -148,7 +148,90 @@ public class LayoutTag extends BodyTagSupport
         if (locbar.equalsIgnoreCase("off"))
         {
             // No location bar
-            request.setAttribute("dspace.layout.locbar", Boolean.FALSE);
+            //request.setAttribute("dspace.layout.locbar", Boolean.FALSE);
+
+            // We'll always add "DSpace Home" to the a location bar
+            parents.add(ConfigurationManager.getProperty("dspace.name"));
+
+            if (locbar.equalsIgnoreCase("nolink"))
+            {
+                parentLinks.add("");
+            }
+            else
+            {
+                parentLinks.add("/");
+            }
+
+            // Add other relevant components to the location bar
+            if (locbar.equalsIgnoreCase("link"))
+            {
+                // "link" mode - next thing in location bar is taken from
+                // parameters of tag, with a link
+                if (parentTitle != null)
+                {
+                    parents.add(parentTitle);
+                    parentLinks.add(parentLink);
+                }
+                else if (parentTitleKey != null)
+                {
+                    parents.add(LocaleSupport.getLocalizedMessage(pageContext,
+                            parentTitleKey));
+                    parentLinks.add(parentLink);
+                }
+
+            }
+            else if (locbar.equalsIgnoreCase("commLink"))
+            {
+                // "commLink" mode - show all parent communities
+                Community[] comms = (Community[]) request
+                        .getAttribute("dspace.communities");
+
+                if (comms != null)
+                {
+                    for (int i = 0; i < comms.length; i++)
+                    {
+                        parents.add(comms[i].getMetadata("name"));
+                        parentLinks.add("/handle/" + comms[i].getHandle());
+                    }
+                }
+            }
+            else if (locbar.equalsIgnoreCase("nolink"))
+            {
+                // "nolink" mode - next thing in location bar is taken from
+                // parameters of tag, with no link
+                if (parentTitle != null)
+                {
+                    parents.add(parentTitle);
+                    parentLinks.add("");
+                }
+            }
+            else
+            {
+                // Grab parents from the URL - these should have been picked up
+                // by the HandleServlet
+                Collection col = (Collection) request
+                        .getAttribute("dspace.collection");
+                Community[] comms = (Community[]) request
+                        .getAttribute("dspace.communities");
+
+                if (comms != null)
+                {
+                    for (int i = 0; i < comms.length; i++)
+                    {
+                        parents.add(comms[i].getMetadata("name"));
+                        parentLinks.add("/handle/" + comms[i].getHandle());
+                    }
+
+                    if (col != null)
+                    {
+                        parents.add(col.getMetadata("name"));
+                        parentLinks.add("/handle/" + col.getHandle());
+                    }
+                }
+            }
+
+            request.setAttribute("dspace.layout.locbar", Boolean.TRUE);
+        
         }
         else
         {
@@ -238,6 +321,8 @@ public class LayoutTag extends BodyTagSupport
         request.setAttribute("dspace.layout.parenttitles", parents);
         request.setAttribute("dspace.layout.parentlinks", parentLinks);
 
+        
+        
         // Navigation bar: "default" is default :)
         if (navbar == null)
         {
@@ -250,8 +335,7 @@ public class LayoutTag extends BodyTagSupport
         }
         else
         {
-            request.setAttribute("dspace.layout.navbar", templatePath + "navbar-"
-                    + navbar + ".jsp");
+            request.setAttribute("dspace.layout.navbar", templatePath + "navbar-"+ navbar + ".jsp");
         }
 
         // Set title
@@ -346,7 +430,7 @@ public class LayoutTag extends BodyTagSupport
         {
             header = templatePath + "header-" + style.toLowerCase() + ".jsp";
         }
-
+        
         if (sidebar != null)
         {
             request.setAttribute("dspace.layout.sidebar", sidebar);

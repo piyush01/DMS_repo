@@ -33,6 +33,18 @@ public interface SearchRequestProcessor
     public void doItemMapSearch(Context context, HttpServletRequest request,
             HttpServletResponse response) throws SearchProcessorException,
             IOException, ServletException;
+    /*
+     * 
+     * code add by Sanjeev Kumar
+     * 
+     * */
+   public void doEzeeAdvancedSearch(Context context, HttpServletRequest request,HttpServletResponse response)throws SearchProcessorException,
+   			IOException, ServletException;
+    /*
+     * 
+     * code End by sanjeev kumar
+     * 
+     * */
     
     public List<String> getSearchIndices();
     
